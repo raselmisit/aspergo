@@ -1,0 +1,36 @@
+{
+  "name": "aspergo",
+  "version": "1.0.0",
+  "description": "ASPER GO E-Commerce Platform - ANYTHING, ANYTIME, ANYWHERE",
+  "main": "server/server.js",
+  "scripts": {
+    "dev": "concurrently \"node server/server.js\" \"npm run dev --prefix client\"",
+    "server": "node server/server.js",
+    "client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "node server/server.js"
+  },
+  "keywords": [
+    "ecommerce",
+    "aspergo",
+    "bangladesh",
+    "react",
+    "express",
+    "sqlite"
+  ],
+  "author": "ASPER GO Team",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary-red: #C8102E;
+    --dark-red: #8B0000;
+    --royal-gold: #F59E0B;
+    --charcoal: #0F172A;
+    --soft-gray: #F8FAFC;
+  }
+
+  body {
+    background-color: #F8FAFC;
+    color: #0F172A;
+    font-family: 'Plus Jakarta Sans', 'Hind Siliguri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', 'Plus Jakarta Sans', 'Hind Siliguri', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* Custom ASPER GO Gradient & Utility Classes */
+.font-display {
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+}
+
+.font-bengali {
+  font-family: 'Hind Siliguri', sans-serif;
+}
+
+.bg-asper-gradient {
+  background: linear-gradient(135deg, #C8102E 0%, #900B20 100%);
+}
+
+.bg-asper-ruby-gradient {
+  background: linear-gradient(135deg, #E11D48 0%, #C8102E 50%, #8B0000 100%);
+}
+
+.bg-asper-gold-gradient {
+  background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 50%, #D97706 100%);
+}
+
+.bg-asper-wine-gradient {
+  background: linear-gradient(135deg, #1E0509 0%, #3D0912 50%, #150205 100%);
+}
+
+.bg-asper-dark-gradient {
+  background: linear-gradient(135deg, #1C0408 0%, #3D0912 55%, #7A0A19 100%);
+}
+
+.text-asper-red {
+  color: #C8102E;
+}
+
+.text-asper-gold {
+  color: #F59E0B;
+}
+
+.border-asper-red {
+  border-color: #C8102E;
+}
+
+.border-asper-gold {
+  border-color: #F59E0B;
+}
+
+.hover-asper-gradient:hover {
+  background: linear-gradient(135deg, #E01438 0%, #A00000 100%);
+}
+
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #C8102E;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8B0000;
+}
+
+/* Pulse badge animation */
+@keyframes softPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.animate-soft-pulse {
+  animation: softPulse 2.5s infinite ease-in-out;
+}

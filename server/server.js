@@ -993,6 +993,6 @@ if (fs.existsSync(clientDist)) {
 }
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 ASPER GO Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 ASPER GO Server running on http://0.0.0.0:${PORT}`);
 });

@@ -1,5 +1,34 @@
 // Unified API Helper for ASPER GO
-const API_BASE = '/api';
+const isNativeApp = typeof window !== 'undefined' && (
+  window.Capacitor?.isNativePlatform?.() ||
+  window.location.protocol === 'capacitor:' ||
+  (window.location.protocol === 'http:' && window.location.hostname === 'localhost' && window.location.port === '')
+);
+
+export const DEFAULT_PRODUCTION_URL = 'https://aspergo.onrender.com';
+
+export function getBackendBaseUrl() {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('aspergo_backend_url');
+    if (saved) return saved.replace(/\/$/, '');
+    if (isNativeApp) {
+      return DEFAULT_PRODUCTION_URL;
+    }
+  }
+  return '';
+}
+
+export function formatImageUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  const base = getBackendBaseUrl();
+  return `${base}${url.startsWith('/') ? url : `/${url}`}`;
+}
 
 export function getAuthToken() {
   return localStorage.getItem('aspergo_token') || '';
@@ -26,7 +55,11 @@ async function request(endpoint, options = {}) {
     delete headers['Content-Type'];
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
+  const base = getBackendBaseUrl();
+  const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const requestUrl = `${base}/api${fullEndpoint}`;
+
+  const response = await fetch(requestUrl, {
     ...options,
     headers,
   });
@@ -95,4 +128,22 @@ export const api = {
   getAdminStats: () => request('/admin/stats'),
   getSettings: () => request('/settings'),
   updateSettings: (settings) => request('/settings', { method: 'PUT', body: JSON.stringify({ settings }) }),
+
+  // Landing Pages
+  getLandingPages: () => request('/landing-pages'),
+  getLandingPage: (slugOrId) => request(`/landing-pages/${slugOrId}`),
+  createLandingPage: (data) => request('/landing-pages', { method: 'POST', body: JSON.stringify(data) }),
+  updateLandingPage: (id, data) => request(`/landing-pages/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteLandingPage: (id) => request(`/landing-pages/${id}`, { method: 'DELETE' }),
+  recordLandingPageView: (id) => request(`/landing-pages/${id}/view`, { method: 'POST' }),
+
+  // Delivery Zones
+  getDeliveryZones: (all = false) => request(`/delivery-zones${all ? '?all=1' : ''}`),
+  createDeliveryZone: (data) => request('/delivery-zones', { method: 'POST', body: JSON.stringify(data) }),
+  updateDeliveryZone: (id, data) => request(`/delivery-zones/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  toggleDeliveryZone: (id) => request(`/delivery-zones/${id}/toggle`, { method: 'PATCH' }),
+  deleteDeliveryZone: (id) => request(`/delivery-zones/${id}`, { method: 'DELETE' }),
+
+  // AI Agent (Marketing, Research, Ad Creator, Customer Support)
+  runAIAgent: (data) => request('/ai/agent', { method: 'POST', body: JSON.stringify(data) }),
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, ShieldCheck, Truck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { formatImageUrl } from '../api';
 
 export default function CartDrawer() {
   const { 
@@ -83,7 +84,7 @@ export default function CartDrawer() {
                   className="flex items-center space-x-3 p-3 bg-gray-50 rounded-2xl border border-gray-100 relative group"
                 >
                   <img
-                    src={item.image}
+                    src={formatImageUrl(item.image)}
                     alt={item.title}
                     className="w-16 h-16 rounded-xl object-cover border border-gray-200 flex-shrink-0"
                   />

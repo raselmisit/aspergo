@@ -1,0 +1,53 @@
+{
+  "name": "ASPER GO | ANYTHING, ANYTIME, ANYWHERE",
+  "short_name": "ASPER GO",
+  "description": "ASPER GO - Bangladesh's leading e-commerce platform for gadgets, fashion, home essentials & daily needs with 24-48h express delivery and Cash on Delivery.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#C8102E",
+  "orientation": "portrait",
+  "lang": "bn",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": [
+    "shopping",
+    "lifestyle",
+    "business"
+  ],
+  "shortcuts": [
+    {
+      "name": "Flash Sale",
+      "short_name": "অফার",
+      "description": "ASPER GO হট ডিল ও ফ্ল্যাশ সেল",
+      "url": "/#flash-deals",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Track Order",
+      "short_name": "ট্র্যাক অর্ডার",
+      "description": "আপনার অর্ডারের বর্তমান অবস্থা দেখুন",
+      "url": "/#track",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    }
+  ]
+}

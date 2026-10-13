@@ -8,7 +8,9 @@
     "server": "node server/server.js",
     "client": "npm run dev --prefix client",
     "build": "npm --prefix client install && npm --prefix client run build",
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "mobile:build": "npm --prefix client run build && npx --prefix client cap sync android",
+    "mobile:open": "npx --prefix client cap open android"
   },
   "keywords": [
     "ecommerce",

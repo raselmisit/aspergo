@@ -1,0 +1,13 @@
+{
+  "appId": "com.aspergo.app",
+  "appName": "ASPER GO",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#C8102E"
+  }
+}

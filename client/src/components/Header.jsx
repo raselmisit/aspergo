@@ -2,27 +2,44 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, ShoppingBag, User, Phone, Truck, Flame, 
   Menu, X, ChevronDown, LogOut, ShieldCheck, Heart, 
-  Sparkles, Layers, ArrowRight, ChevronRight, Tag
+  Sparkles, Layers, ArrowRight, ChevronRight, Tag, Smartphone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { api } from '../api';
+import { getCategoryEmoji, getSubcategoryEmoji } from '../utils/categoryEmojis';
 
 export default function Header({ 
   currentView, 
   setCurrentView, 
   selectedCategory, 
   setSelectedCategory,
-  onProductClick
+  onProductClick,
+  onAppInstallClick,
+  searchQuery: propSearchQuery,
+  setSearchQuery: propSetSearchQuery,
+  onSearch
 }) {
   const { user, logout, isSuperAdmin, isManager, isAdminOrManager, setAuthModalOpen, setAuthModalTab, switchDemoRole } = useAuth();
   const { cartCount, cartSubtotal, setCartDrawerOpen } = useCart();
 
   const [categories, setCategories] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const searchQuery = propSearchQuery !== undefined ? propSearchQuery : localSearchQuery;
+  const setSearchQuery = propSetSearchQuery || setLocalSearchQuery;
+
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setSearchOpen(false);
+    if (onSearch) {
+      onSearch(searchQuery.trim());
+    }
+  };
   
   // Hover-driven 3-Tier Cascading Mega Menu States
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
@@ -213,29 +230,37 @@ export default function Header({
 
           {/* Dynamic Search Bar */}
           <div ref={searchRef} className="relative flex-1 max-w-2xl hidden md:block">
-            <div className="flex items-center border-2 border-[#C8102E] rounded-full overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-red-300">
+            <form onSubmit={handleSearchSubmit} className="flex items-center border-2 border-[#C8102E] rounded-full overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-red-300">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => searchQuery.trim() && setSearchOpen(true)}
-                placeholder="Search products, smart gadgets, fashion, groceries..."
+                placeholder="পণ্যের নাম, ক্যাটাগরি (ASPER MOTORS, Gadgets, Fashion) দিয়ে খুঁজুন..."
                 className="w-full py-2.5 px-5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none"
               />
-              <button className="bg-asper-gradient text-white px-6 py-2.5 hover:opacity-95 flex items-center justify-center transition">
+              <button 
+                type="submit" 
+                title="Search" 
+                className="bg-asper-gradient text-white px-6 py-2.5 hover:opacity-95 flex items-center justify-center transition cursor-pointer active:scale-95"
+              >
                 <Search className="w-4 h-4" />
               </button>
-            </div>
+            </form>
 
             {/* Live Search Suggestions Dropdown */}
             {searchOpen && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 py-3 z-50 max-h-96 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 py-3 z-50 max-h-96 overflow-y-auto">
                 {isSearching ? (
-                  <div className="p-4 text-center text-sm text-gray-500">Searching products...</div>
+                  <div className="p-4 text-center text-sm text-gray-500 flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-[#C8102E] border-t-transparent rounded-full animate-spin"></div>
+                    <span>পণ্য খোঁজা হচ্ছে...</span>
+                  </div>
                 ) : searchResults.length > 0 ? (
-                  <div>
-                    <div className="px-4 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                      Search Results ({searchResults.length})
+                  <div className="space-y-1">
+                    <div className="px-4 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center justify-between border-b border-gray-100 pb-1.5">
+                      <span>অনুসন্ধানের ফলাফল ({searchResults.length})</span>
+                      <span className="text-[10px] text-red-600 font-bold">পণ্য ক্লিক করে বিস্তারিত দেখুন</span>
                     </div>
                     {searchResults.map((product) => (
                       <div
@@ -243,21 +268,34 @@ export default function Header({
                         onClick={() => {
                           onProductClick(product);
                           setSearchOpen(false);
-                          setSearchQuery('');
                         }}
-                        className="flex items-center px-4 py-2.5 hover:bg-red-50/70 cursor-pointer transition gap-3"
+                        className="flex items-center px-4 py-2.5 hover:bg-red-50/70 cursor-pointer transition gap-3 border-b border-gray-50 last:border-0"
                       >
                         <img 
                           src={product.image} 
                           alt={product.title} 
-                          className="w-12 h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
+                          className="w-12 h-12 rounded-xl object-cover border border-gray-200 flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-semibold text-gray-800 truncate">{product.title}</h4>
-                          <span className="text-xs text-gray-500">{product.category_name}</span>
+                          <h4 className="text-sm font-bold text-gray-900 truncate">{product.title}</h4>
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5 truncate">
+                            <span className="font-semibold text-red-700 bg-red-50 px-1.5 py-0.5 rounded text-[10px]">
+                              {getCategoryEmoji(product.category_name)} {product.category_name}
+                            </span>
+                            {product.subcategory_name && (
+                              <span className="text-gray-400 text-[10px] truncate">
+                                › {getSubcategoryEmoji(product.subcategory_name, product.category_name)} {product.subcategory_name}
+                              </span>
+                            )}
+                            {product.sub_subcategory_name && (
+                              <span className="text-gray-400 text-[10px] truncate">
+                                › {product.sub_subcategory_name}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-[#C8102E]">
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm font-black text-[#C8102E]">
                             ৳{product.discount_price || product.price}
                           </div>
                           {product.discount_price && (
@@ -268,10 +306,22 @@ export default function Header({
                         </div>
                       </div>
                     ))}
+
+                    <div className="p-2 pt-2 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={handleSearchSubmit}
+                        className="w-full py-2.5 text-center text-xs font-black text-[#C8102E] bg-red-50 hover:bg-red-100 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                        <span>"{searchQuery}" সম্পর্কিত সকল পণ্য ক্যাটালগে দেখুন →</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-4 text-center text-sm text-gray-500">
-                    No products found for "{searchQuery}"
+                  <div className="p-6 text-center text-sm text-gray-500 space-y-1">
+                    <p className="font-bold text-gray-700">"{searchQuery}" এর জন্য কোনো পণ্য পাওয়া যায়নি</p>
+                    <p className="text-xs text-gray-400">ক্যাটাগরি (ASPER MOTORS, Electronics, Fashion) বা পণ্যের নাম দিয়ে চেষ্টা করুন।</p>
                   </div>
                 )}
               </div>
@@ -376,6 +426,16 @@ export default function Header({
               )}
             </div>
 
+            {/* Mobile App Install Button */}
+            <button
+              onClick={onAppInstallClick}
+              className="flex items-center space-x-1 px-2 sm:px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border border-amber-300 text-xs font-bold transition shadow-2xs"
+              title="ASPER GO মোবাইল অ্যাপ"
+            >
+              <Smartphone className="w-4 h-4 text-amber-600" />
+              <span className="hidden sm:inline">Get App</span>
+            </button>
+
             {/* Cart Trigger */}
             <button
               onClick={() => setCartDrawerOpen(true)}
@@ -407,18 +467,18 @@ export default function Header({
 
         {/* Mobile Search Bar */}
         <div className="mt-3 md:hidden">
-          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm focus-within:border-[#C8102E]">
+          <form onSubmit={handleSearchSubmit} className="flex items-center border border-gray-300 rounded-xl overflow-hidden bg-white shadow-sm focus-within:border-[#C8102E]">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products..."
-              className="w-full py-2 px-3 text-sm text-gray-800 focus:outline-none"
+              placeholder="পণ্য বা ক্যাটাগরি (ASPER MOTORS, Gadgets) খুঁজুন..."
+              className="w-full py-2.5 px-3.5 text-xs text-gray-800 focus:outline-none"
             />
-            <button className="bg-asper-gradient text-white px-4 py-2">
+            <button type="submit" className="bg-asper-gradient text-white px-4 py-2.5 flex items-center justify-center">
               <Search className="w-4 h-4" />
             </button>
-          </div>
+          </form>
         </div>
       </div>
 
@@ -465,7 +525,9 @@ export default function Header({
                         }`}
                       >
                         <div className="flex items-center space-x-2.5 truncate">
-                          <Sparkles className={`w-4 h-4 flex-shrink-0 ${isHovered ? 'text-[#C8102E]' : 'text-gray-400'}`} />
+                          <span className="text-base flex-shrink-0 leading-none filter drop-shadow-xs transition-transform group-hover:scale-110">
+                            {getCategoryEmoji(cat.name, cat.icon)}
+                          </span>
                           <span className="truncate">{cat.name}</span>
                         </div>
                         {cat.subcategories && cat.subcategories.length > 0 && (
@@ -497,7 +559,9 @@ export default function Header({
                           }`}
                         >
                           <div className="flex items-center space-x-2.5 truncate">
-                            <span className="text-xs text-amber-600">📁</span>
+                            <span className="text-sm flex-shrink-0 leading-none filter drop-shadow-xs">
+                              {getSubcategoryEmoji(sub.name, hoveredCategory?.name, sub.icon)}
+                            </span>
                             <span className="truncate">{sub.name}</span>
                           </div>
                           <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isSubHovered ? 'text-[#C8102E]' : 'text-gray-300'}`} />
@@ -575,41 +639,55 @@ export default function Header({
             )}
           </div>
 
-          {/* Quick Categories Horizontal Bar */}
-          <div className="hidden lg:flex items-center space-x-1 overflow-x-auto py-1">
+          {/* Quick Categories Horizontal Bar - Mega Flash Sale Style with Bold Typography & Emojis */}
+          <div className="hidden lg:flex items-center space-x-2 overflow-x-auto py-2 flex-1 mx-3 no-scrollbar">
+            {/* All Products Pill */}
             <button
               onClick={() => handleSelectFilter(null)}
-              className={`px-3 py-2 text-xs font-bold rounded-lg transition ${
+              className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-2xs ${
                 !selectedCategory && currentView === 'shop' 
-                  ? 'text-[#C8102E] bg-red-50' 
-                  : 'text-gray-700 hover:text-[#C8102E] hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-red-600 to-[#C8102E] text-white border-2 border-[#C8102E] shadow-sm ring-2 ring-red-400/30' 
+                  : 'bg-white hover:bg-red-50/80 text-slate-800 hover:text-[#C8102E] border border-slate-200/90 hover:border-red-300'
               }`}
             >
-              All Products
+              <span className="text-sm leading-none filter drop-shadow-xs">🛍️</span>
+              <span>All Products</span>
             </button>
 
-            {categories.slice(0, 5).map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => handleSelectFilter(cat.slug)}
-                className={`px-3 py-2 text-xs font-medium rounded-lg whitespace-nowrap transition ${
-                  selectedCategory === cat.slug 
-                    ? 'text-[#C8102E] bg-red-50 font-bold' 
-                    : 'text-gray-600 hover:text-[#C8102E] hover:bg-gray-50'
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
+            {/* Dynamic Product Categories with Bold Typography & Emojis */}
+            {categories.map((cat) => {
+              const isSelected = (selectedCategory === cat.slug);
+              const emoji = getCategoryEmoji(cat.name, cat.icon);
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => handleSelectFilter(cat.slug)}
+                  className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-2xs group ${
+                    isSelected 
+                      ? 'bg-gradient-to-r from-red-600 to-[#C8102E] text-white border-2 border-[#C8102E] shadow-sm ring-2 ring-red-400/30' 
+                      : 'bg-white hover:bg-red-50/80 text-slate-800 hover:text-[#C8102E] border border-slate-200/90 hover:border-red-300 hover:scale-102 active:scale-98'
+                  }`}
+                >
+                  <span className="text-sm leading-none filter drop-shadow-xs transition-transform group-hover:scale-110">
+                    {emoji}
+                  </span>
+                  <span>{cat.name}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Flash Deals Tab with Badge */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-shrink-0">
             <button
               onClick={() => handleSelectFilter('flash-deals')}
-              className="flex items-center space-x-1.5 text-xs font-extrabold text-[#C8102E] bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition animate-soft-pulse border border-red-200"
+              className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-md ${
+                selectedCategory === 'flash-deals'
+                  ? 'bg-amber-400 text-slate-950 border-2 border-amber-300 ring-2 ring-amber-400/40'
+                  : 'text-white bg-gradient-to-r from-[#C8102E] via-red-600 to-amber-500 hover:opacity-95 border border-amber-300/40 animate-soft-pulse shadow-red-500/20'
+              }`}
             >
-              <Flame className="w-4 h-4 fill-red-600 text-red-600" />
+              <Flame className="w-4 h-4 fill-amber-300 text-amber-300 animate-bounce" />
               <span>MEGA FLASH SALE</span>
             </button>
           </div>
@@ -624,51 +702,70 @@ export default function Header({
           <div className="space-y-2">
             <button
               onClick={() => handleSelectFilter(null)}
-              className="w-full text-left text-xs p-2.5 rounded-xl bg-gray-50 hover:bg-red-50 text-gray-800 font-bold flex items-center justify-between"
+              className={`w-full text-left text-xs p-3 rounded-2xl font-black flex items-center justify-between border transition ${
+                !selectedCategory && currentView === 'shop'
+                  ? 'bg-red-50 border-red-300 text-[#C8102E]'
+                  : 'bg-gray-50 border-gray-200 text-gray-800'
+              }`}
             >
-              <span>All Products</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base leading-none">🛍️</span>
+                <span>All Products</span>
+              </div>
               <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
             </button>
 
-            {categories.map(cat => (
-              <div key={cat.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => handleSelectFilter(cat.slug)}
-                  className="w-full text-left text-xs p-2.5 bg-gray-50 hover:bg-red-50 text-gray-900 font-bold flex items-center justify-between"
-                >
-                  <span>{cat.name}</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                </button>
+            {categories.map(cat => {
+              const isSelected = (selectedCategory === cat.slug);
+              return (
+                <div key={cat.id} className="border border-gray-200 rounded-2xl overflow-hidden shadow-2xs">
+                  <button
+                    onClick={() => handleSelectFilter(cat.slug)}
+                    className={`w-full text-left text-xs p-3 font-black flex items-center justify-between transition ${
+                      isSelected ? 'bg-red-50 text-[#C8102E]' : 'bg-gray-50 hover:bg-red-50 text-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-base leading-none">{getCategoryEmoji(cat.name, cat.icon)}</span>
+                      <span className="truncate">{cat.name}</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  </button>
 
-                {cat.subcategories && cat.subcategories.length > 0 && (
-                  <div className="bg-white p-2 border-t border-gray-100 space-y-1.5">
-                    {cat.subcategories.map(sub => (
-                      <div key={sub.id} className="pl-2">
-                        <button
-                          onClick={() => handleSelectFilter(sub.slug)}
-                          className="text-left text-xs text-gray-700 hover:text-[#C8102E] font-semibold py-1 block w-full"
-                        >
-                          • {sub.name}
-                        </button>
-                        {sub.sub_subcategories && sub.sub_subcategories.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pl-3 pt-0.5 pb-1">
-                            {sub.sub_subcategories.map(child => (
-                              <button
-                                key={child.id}
-                                onClick={() => handleSelectFilter(child.slug)}
-                                className="text-[10px] bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-[#C8102E] px-1.5 py-0.5 rounded"
-                              >
-                                {child.name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                  {cat.subcategories && cat.subcategories.length > 0 && (
+                    <div className="bg-white p-2 border-t border-gray-100 space-y-1">
+                      {cat.subcategories.map(sub => (
+                        <div key={sub.id} className="pl-1">
+                          <button
+                            onClick={() => handleSelectFilter(sub.slug)}
+                            className="text-left text-xs text-gray-700 hover:text-[#C8102E] font-bold py-1.5 px-2 rounded-lg hover:bg-red-50 flex items-center justify-between w-full transition"
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="text-sm leading-none">{getSubcategoryEmoji(sub.name, cat.name, sub.icon)}</span>
+                              <span className="truncate">{sub.name}</span>
+                            </div>
+                            <span className="text-gray-400 text-xs">›</span>
+                          </button>
+                          {sub.sub_subcategories && sub.sub_subcategories.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pl-6 pt-0.5 pb-1">
+                              {sub.sub_subcategories.map(child => (
+                                <button
+                                  key={child.id}
+                                  onClick={() => handleSelectFilter(child.slug)}
+                                  className="text-[10px] font-semibold bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-[#C8102E] px-2 py-0.5 rounded-full"
+                                >
+                                  🔹 {child.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div className="border-t border-gray-100 pt-3 flex flex-col space-y-2">

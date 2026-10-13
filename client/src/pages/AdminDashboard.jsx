@@ -5,13 +5,17 @@ import {
   AlertCircle, Upload, Eye, Image, TrendingUp, DollarSign,
   ArrowUpRight, RefreshCw, X, Save, Sparkles, Filter, Search,
   ChevronRight, CornerDownRight, Video, Play, Monitor, Smartphone,
-  Star, Film, ArrowRight, Zap, Check, CheckSquare
+  Star, Film, ArrowRight, Zap, Check, CheckSquare, Bot, Truck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
 import { compressImage, formatBytes, inspectVideo } from '../utils/mediaCompressor';
+import AdminLandingManager from '../components/admin/AdminLandingManager';
+import AdminPixelManager from '../components/admin/AdminPixelManager';
+import AdminAIAgentView from '../components/admin/AdminAIAgentView';
+import { getCategoryEmoji, getSubcategoryEmoji, PRESET_EMOJIS } from '../utils/categoryEmojis';
 
-export default function AdminDashboard({ onBackToStore }) {
+export default function AdminDashboard({ onBackToStore, onOpenLandingPage }) {
   const { user, isSuperAdmin, isManager } = useAuth();
 
   const [activeTab, setActiveTab] = useState('stats'); // 'stats' | 'products' | 'categories' | 'orders' | 'banners' | 'users' | 'settings'
@@ -26,6 +30,12 @@ export default function AdminDashboard({ onBackToStore }) {
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  
+  // Custom Delivery Zones State
+  const [deliveryZones, setDeliveryZones] = useState([]);
+  const [newZoneName, setNewZoneName] = useState('');
+  const [newZoneCharge, setNewZoneCharge] = useState(60);
+  const [newZoneTime, setNewZoneTime] = useState('২৪-৪৮ ঘণ্টা');
 
   // Product Modal State
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -70,10 +80,10 @@ export default function AdminDashboard({ onBackToStore }) {
 
   // Category Modals State
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
-  const [categoryForm, setCategoryForm] = useState({ name: '', icon: 'ShoppingBag', description: '', display_order: 0 });
+  const [categoryForm, setCategoryForm] = useState({ name: '', icon: '', description: '', display_order: 0 });
   
   const [subcategoryModalOpen, setSubcategoryModalOpen] = useState(false);
-  const [subcategoryForm, setSubcategoryForm] = useState({ category_id: '', name: '', description: '' });
+  const [subcategoryForm, setSubcategoryForm] = useState({ category_id: '', name: '', icon: '', description: '' });
 
   const [subSubcategoryModalOpen, setSubSubcategoryModalOpen] = useState(false);
   const [subSubcategoryForm, setSubSubcategoryForm] = useState({ category_id: '', subcategory_id: '', name: '', description: '' });
@@ -110,8 +120,12 @@ export default function AdminDashboard({ onBackToStore }) {
         const userRes = await api.getAdminUsers();
         setUsersList(userRes.users || []);
       } else if (activeTab === 'settings' && isSuperAdmin) {
-        const setRes = await api.getSettings();
+        const [setRes, zoneRes] = await Promise.all([
+          api.getSettings(),
+          api.getDeliveryZones(true)
+        ]);
         setSettings(setRes.settings || {});
+        setDeliveryZones(zoneRes.zones || []);
       }
     } catch (err) {
       console.error(err);
@@ -383,10 +397,14 @@ export default function AdminDashboard({ onBackToStore }) {
   const handleSaveCategory = async (e) => {
     e.preventDefault();
     try {
-      await api.createCategory(categoryForm);
-      notify('success', 'New Category added!');
+      const emojiToSave = (categoryForm.icon && categoryForm.icon.trim()) 
+        ? categoryForm.icon.trim() 
+        : getCategoryEmoji(categoryForm.name);
+
+      await api.createCategory({ ...categoryForm, icon: emojiToSave });
+      notify('success', `New Category added with icon ${emojiToSave}!`);
       setCategoryModalOpen(false);
-      setCategoryForm({ name: '', icon: 'ShoppingBag', description: '', display_order: 0 });
+      setCategoryForm({ name: '', icon: '', description: '', display_order: 0 });
       loadAllData();
     } catch (err) {
       notify('error', err.message);
@@ -409,10 +427,15 @@ export default function AdminDashboard({ onBackToStore }) {
   const handleSaveSubcategory = async (e) => {
     e.preventDefault();
     try {
-      await api.createSubcategory(subcategoryForm);
-      notify('success', 'Subcategory created!');
+      const parentCat = categories.find(c => String(c.id) === String(subcategoryForm.category_id));
+      const emojiToSave = (subcategoryForm.icon && subcategoryForm.icon.trim())
+        ? subcategoryForm.icon.trim()
+        : getSubcategoryEmoji(subcategoryForm.name, parentCat?.name);
+
+      await api.createSubcategory({ ...subcategoryForm, icon: emojiToSave });
+      notify('success', `Subcategory created with icon ${emojiToSave}!`);
       setSubcategoryModalOpen(false);
-      setSubcategoryForm({ category_id: '', name: '', description: '' });
+      setSubcategoryForm({ category_id: '', name: '', icon: '', description: '' });
       loadAllData();
     } catch (err) {
       notify('error', err.message);
@@ -497,6 +520,48 @@ export default function AdminDashboard({ onBackToStore }) {
     try {
       await api.updateSettings(settings);
       notify('success', 'Site settings updated successfully!');
+    } catch (err) {
+      notify('error', err.message);
+    }
+  };
+
+  // Delivery Zones Handlers
+  const handleToggleDeliveryZone = async (id) => {
+    try {
+      const res = await api.toggleDeliveryZone(id);
+      setDeliveryZones(prev => prev.map(z => z.id === id ? { ...z, is_active: res.is_active } : z));
+      notify('success', res.message || 'ডেলিভারি জোনের স্ট্যাটাস পরিবর্তিত হয়েছে!');
+    } catch (err) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleAddDeliveryZone = async (e) => {
+    e.preventDefault();
+    if (!newZoneName.trim()) return;
+    try {
+      await api.createDeliveryZone({
+        name: newZoneName.trim(),
+        charge: Number(newZoneCharge) || 0,
+        estimated_time: newZoneTime || '২৪-৪৮ ঘণ্টা',
+        is_active: 1
+      });
+      setNewZoneName('');
+      setNewZoneCharge(60);
+      const zoneRes = await api.getDeliveryZones(true);
+      setDeliveryZones(zoneRes.zones || []);
+      notify('success', 'নতুন ডেলিভারি জোন সফলভাবে যুক্ত হয়েছে!');
+    } catch (err) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleDeleteDeliveryZone = async (id) => {
+    if (!window.confirm('আপনি কি নিশ্চিতভাবে এই ডেলিভারি জোনটি মুছে ফেলতে চান?')) return;
+    try {
+      await api.deleteDeliveryZone(id);
+      setDeliveryZones(prev => prev.filter(z => z.id !== id));
+      notify('success', 'ডেলিভারি জোন মুছে ফেলা হয়েছে।');
     } catch (err) {
       notify('error', err.message);
     }
@@ -597,6 +662,42 @@ export default function AdminDashboard({ onBackToStore }) {
             >
               <Image className="w-4 h-4" />
               <span>Promotions & Banners</span>
+            </button>
+
+            {/* Growth, Landing & Marketing AI Controls */}
+            <div className="pt-2 border-t border-gray-100 mt-2 text-[10px] font-black text-gray-400 uppercase px-3 flex items-center justify-between">
+              <span>Marketing & AI Tools</span>
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+            </div>
+
+            <button
+              onClick={() => setActiveTab('landing')}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2.5 transition cursor-pointer ${
+                activeTab === 'landing' ? 'bg-gradient-to-r from-[#C8102E] to-[#990011] text-white shadow-md border-l-4 border-amber-400' : 'text-gray-700 hover:bg-red-50 hover:text-[#C8102E]'
+              }`}
+            >
+              <Smartphone className="w-4 h-4 text-amber-500" />
+              <span>Landing Page & Social Post</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('ai_agent')}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2.5 transition cursor-pointer ${
+                activeTab === 'ai_agent' ? 'bg-gradient-to-r from-[#C8102E] to-[#990011] text-white shadow-md border-l-4 border-amber-400' : 'text-gray-700 hover:bg-red-50 hover:text-[#C8102E]'
+              }`}
+            >
+              <Bot className="w-4 h-4 text-purple-500" />
+              <span>AI Marketing & Research</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('pixels')}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold flex items-center space-x-2.5 transition cursor-pointer ${
+                activeTab === 'pixels' ? 'bg-gradient-to-r from-[#C8102E] to-[#990011] text-white shadow-md border-l-4 border-amber-400' : 'text-gray-700 hover:bg-red-50 hover:text-[#C8102E]'
+              }`}
+            >
+              <Zap className="w-4 h-4 text-blue-500" />
+              <span>Pixel & Tracking Setup</span>
             </button>
 
             {/* Super Admin Only Tabs */}
@@ -927,8 +1028,11 @@ export default function AdminDashboard({ onBackToStore }) {
                       
                       {/* Main Category Header */}
                       <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                        <div className="flex items-center space-x-2">
-                          <span className="font-black text-sm text-gray-900 uppercase tracking-wide">{cat.name}</span>
+                        <div className="flex items-center space-x-2.5">
+                          <span className="text-xl leading-none filter drop-shadow-xs">
+                            {getCategoryEmoji(cat.name, cat.icon)}
+                          </span>
+                          <span className="font-black text-sm text-gray-900 tracking-wide">{cat.name}</span>
                           <span className="text-[10px] text-gray-400 bg-white px-2 py-0.5 rounded border">
                             slug: {cat.slug}
                           </span>
@@ -951,8 +1055,10 @@ export default function AdminDashboard({ onBackToStore }) {
                                 
                                 {/* Subcategory Bar */}
                                 <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-1.5 font-bold text-xs text-gray-800">
-                                    <span className="text-[#C8102E]">📁</span>
+                                  <div className="flex items-center space-x-2 font-bold text-xs text-gray-800">
+                                    <span className="text-base leading-none">
+                                      {getSubcategoryEmoji(sub.name, cat.name, sub.icon)}
+                                    </span>
                                     <span>{sub.name}</span>
                                   </div>
                                   
@@ -986,7 +1092,7 @@ export default function AdminDashboard({ onBackToStore }) {
                                   {sub.sub_subcategories && sub.sub_subcategories.length > 0 ? (
                                     sub.sub_subcategories.map(child => (
                                       <div key={child.id} className="bg-gray-100 text-gray-700 rounded-md px-2 py-0.5 text-[11px] flex items-center space-x-1">
-                                        <span className="font-medium">{child.name}</span>
+                                        <span className="font-semibold">🔹 {child.name}</span>
                                         <button
                                           onClick={() => handleDeleteSubSubcategory(child.id)}
                                           className="text-gray-400 hover:text-red-600 font-black ml-1"
@@ -1292,25 +1398,145 @@ export default function AdminDashboard({ onBackToStore }) {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-1">Inside Dhaka Delivery (৳)</label>
-                    <input
-                      type="number"
-                      value={settings.inside_dhaka_delivery || '60'}
-                      onChange={(e) => setSettings({ ...settings, inside_dhaka_delivery: e.target.value })}
-                      className="w-full border rounded-xl p-2.5"
-                    />
+                {/* Dynamic Delivery Zones & Rates Manager */}
+                <div className="pt-2 border-t border-gray-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-black text-sm text-gray-900 flex items-center gap-1.5">
+                        <Truck className="w-4 h-4 text-[#C8102E]" />
+                        <span>ডেলিভারি জোন ও চার্জ নিয়ন্ত্রণ (Delivery Zones & On/Off)</span>
+                      </h3>
+                      <p className="text-[11px] text-gray-500">
+                        আপনার পছন্দমতো যেকোনো ডেলিভারি জোন যুক্ত করুন এবং সুইচের মাধ্যমে অন/অফ করুন।
+                      </p>
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-1">Outside Dhaka Delivery (৳)</label>
-                    <input
-                      type="number"
-                      value={settings.outside_dhaka_delivery || '120'}
-                      onChange={(e) => setSettings({ ...settings, outside_dhaka_delivery: e.target.value })}
-                      className="w-full border rounded-xl p-2.5"
-                    />
+                  {/* Active / Inactive Delivery Zones List */}
+                  <div className="space-y-2">
+                    {deliveryZones.length === 0 ? (
+                      <div className="p-4 bg-gray-50 text-center text-xs text-gray-400 rounded-xl">
+                        কোনো ডেলিভারি জোন নেই। নিচের ফর্ম থেকে যুক্ত করুন।
+                      </div>
+                    ) : (
+                      deliveryZones.map((zone) => (
+                        <div
+                          key={zone.id}
+                          className={`p-3 rounded-2xl border transition flex items-center justify-between gap-3 ${
+                            zone.is_active === 1
+                              ? 'bg-white border-emerald-200 shadow-2xs'
+                              : 'bg-gray-50 border-gray-200 opacity-60'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-3">
+                            {/* Toggle Switch */}
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDeliveryZone(zone.id)}
+                              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                zone.is_active === 1 ? 'bg-emerald-500' : 'bg-gray-300'
+                              }`}
+                              title={zone.is_active === 1 ? 'চালু আছে (অন)' : 'বন্ধ আছে (অফ)'}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                                  zone.is_active === 1 ? 'translate-x-5' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-gray-900">{zone.name}</span>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                                  zone.is_active === 1
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-gray-200 text-gray-600'
+                                }`}>
+                                  {zone.is_active === 1 ? 'অন (Active)' : 'অফ (Inactive)'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-gray-400">ডেলিভারি সময়: {zone.estimated_time || '২৪-৪৮ ঘণ্টা'}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-3">
+                            <span className="font-black text-sm text-[#C8102E] bg-red-50 border border-red-100 px-3 py-1 rounded-xl">
+                              ৳{zone.charge}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteDeliveryZone(zone.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                              title="মুছে ফেলুন"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Add New Custom Zone Form */}
+                  <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-2xl space-y-3">
+                    <span className="font-bold text-xs text-gray-800 block">
+                      + নতুন ডেলিভারি জোন যুক্ত করুন:
+                    </span>
+
+                    {/* Quick Presets */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] text-gray-400 font-semibold">কুইক প্রিসেট:</span>
+                      {[
+                        { name: 'Inside Saidpur (সৈয়দপুর সিটি)', charge: 40 },
+                        { name: 'Rangpur Division (রংপুর বিভাগ)', charge: 80 },
+                        { name: 'Inside Dhaka (ঢাকা সিটি)', charge: 60 },
+                        { name: 'All Bangladesh (সারা বাংলাদেশ)', charge: 120 },
+                        { name: 'Free Delivery (ফ্রি ডেলিভারি)', charge: 0 }
+                      ].map((preset, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => {
+                            setNewZoneName(preset.name);
+                            setNewZoneCharge(preset.charge);
+                          }}
+                          className="px-2 py-0.5 bg-white border border-gray-200 hover:border-red-500 hover:text-red-600 rounded-md text-[10px] font-medium transition cursor-pointer"
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                      <div className="sm:col-span-6">
+                        <input
+                          type="text"
+                          value={newZoneName}
+                          onChange={(e) => setNewZoneName(e.target.value)}
+                          placeholder="জোনের নাম (যেমন: Inside Saidpur বা রংপুর বিভাগ)"
+                          className="w-full bg-white border border-gray-200 rounded-xl p-2 text-xs"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <input
+                          type="number"
+                          value={newZoneCharge}
+                          onChange={(e) => setNewZoneCharge(e.target.value)}
+                          placeholder="চার্জ (৳)"
+                          className="w-full bg-white border border-gray-200 rounded-xl p-2 text-xs font-bold"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <button
+                          type="button"
+                          onClick={handleAddDeliveryZone}
+                          className="w-full py-2 bg-[#C8102E] hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
+                        >
+                          যুক্ত করুন
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1344,6 +1570,26 @@ export default function AdminDashboard({ onBackToStore }) {
                 </button>
               </form>
             </div>
+          )}
+
+          {activeTab === 'landing' && (
+            <AdminLandingManager 
+              products={products}
+              onOpenLandingPage={onOpenLandingPage}
+            />
+          )}
+
+          {activeTab === 'ai_agent' && (
+            <AdminAIAgentView
+              products={products}
+              onCreateLandingWithAd={() => {
+                setActiveTab('landing');
+              }}
+            />
+          )}
+
+          {activeTab === 'pixels' && (
+            <AdminPixelManager />
           )}
 
         </div>
@@ -2076,25 +2322,75 @@ export default function AdminDashboard({ onBackToStore }) {
       {/* 1. Main Category Modal */}
       {categoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-base text-gray-900">Add New Main Category</h3>
+              <div>
+                <h3 className="font-black text-base text-gray-900">Add New Main Category</h3>
+                <p className="text-[11px] text-gray-500">বোল্ড স্টাইল ও আকর্ষনীয় ইমোজিসহ ক্যাটাগরি তৈরি করুন</p>
+              </div>
               <button onClick={() => setCategoryModalOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <form onSubmit={handleSaveCategory} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold mb-1">Category Name *</label>
+                <label className="block font-bold mb-1 text-gray-700">Category Name *</label>
                 <input
                   type="text"
                   required
                   value={categoryForm.name}
                   onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
-                  placeholder="e.g. ASPER MOTORS"
-                  className="w-full border rounded-xl p-2.5"
+                  placeholder="e.g. ASPER MOTORS, Gadgets, Fashion"
+                  className="w-full border rounded-xl p-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-red-400"
                 />
               </div>
-              <button type="submit" className="w-full bg-[#C8102E] text-white py-3 rounded-xl font-bold">
-                Save Main Category
+
+              {/* Emoji Picker & Selector */}
+              <div>
+                <label className="block font-bold mb-1 text-gray-700">
+                  Category Emoji / Icon (ইমোজি বেছে নিন)
+                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={categoryForm.icon}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, icon: e.target.value })}
+                    placeholder="Auto or paste emoji (যেমন: 🏍️, 📱)"
+                    className="w-full border rounded-xl p-2.5 text-sm"
+                  />
+                  <div className="text-2xl p-1 bg-gray-50 rounded-xl border flex items-center justify-center min-w-[42px] min-h-[42px]">
+                    {categoryForm.icon || getCategoryEmoji(categoryForm.name)}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border rounded-xl max-h-24 overflow-y-auto">
+                  {PRESET_EMOJIS.slice(0, 24).map(em => (
+                    <button
+                      key={em}
+                      type="button"
+                      onClick={() => setCategoryForm({ ...categoryForm, icon: em })}
+                      className={`text-base p-1.5 rounded-lg hover:bg-white hover:scale-115 transition ${
+                        categoryForm.icon === em ? 'bg-red-100 ring-2 ring-red-400' : 'bg-white/70'
+                      }`}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Live Preview Pill */}
+              <div className="p-3 bg-red-50/60 rounded-2xl border border-red-200/80 space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                  লাইভ প্রিভিউ (ওয়েবসাইটে যেমন দেখাবে):
+                </span>
+                <div className="inline-flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full bg-white border border-slate-200/90 text-slate-800 shadow-2xs">
+                  <span className="text-sm leading-none filter drop-shadow-xs">
+                    {categoryForm.icon || getCategoryEmoji(categoryForm.name)}
+                  </span>
+                  <span>{categoryForm.name || 'Category Name'}</span>
+                </div>
+              </div>
+
+              <button type="submit" className="w-full bg-gradient-to-r from-[#C8102E] to-red-700 hover:opacity-95 text-white py-3 rounded-xl font-bold shadow-md transition cursor-pointer">
+                Save Main Category (সংরক্ষণ করুন)
               </button>
             </form>
           </div>
@@ -2104,35 +2400,89 @@ export default function AdminDashboard({ onBackToStore }) {
       {/* 2. Subcategory Modal */}
       {subcategoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
-              <h3 className="font-black text-base text-gray-900">Add New Subcategory</h3>
+              <div>
+                <h3 className="font-black text-base text-gray-900">Add New Subcategory</h3>
+                <p className="text-[11px] text-gray-500">সাব-ক্যাটাগরির সামনে আকর্ষণীয় ইমোজি যোগ করুন</p>
+              </div>
               <button onClick={() => setSubcategoryModalOpen(false)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <form onSubmit={handleSaveSubcategory} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold mb-1">Parent Main Category *</label>
+                <label className="block font-bold mb-1 text-gray-700">Parent Main Category *</label>
                 <select
                   required
                   value={subcategoryForm.category_id}
                   onChange={(e) => setSubcategoryForm({ ...subcategoryForm, category_id: e.target.value })}
-                  className="w-full border rounded-xl p-2.5"
+                  className="w-full border rounded-xl p-2.5 text-sm"
                 >
                   <option value="">Select Parent Category</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {getCategoryEmoji(c.name, c.icon)} {c.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block font-bold mb-1">Subcategory Name *</label>
+                <label className="block font-bold mb-1 text-gray-700">Subcategory Name *</label>
                 <input
                   type="text"
                   required
                   value={subcategoryForm.name}
                   onChange={(e) => setSubcategoryForm({ ...subcategoryForm, name: e.target.value })}
-                  placeholder="e.g. Helmets"
-                  className="w-full border rounded-xl p-2.5"
+                  placeholder="e.g. Helmets, Smart Watches, T-Shirts"
+                  className="w-full border rounded-xl p-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-red-400"
                 />
               </div>
+
+              {/* Subcategory Emoji Selector */}
+              <div>
+                <label className="block font-bold mb-1 text-gray-700">
+                  Subcategory Emoji (ইমোজি বেছে নিন)
+                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={subcategoryForm.icon}
+                    onChange={(e) => setSubcategoryForm({ ...subcategoryForm, icon: e.target.value })}
+                    placeholder="Auto or pick emoji (যেমন: 🪖, 🎧)"
+                    className="w-full border rounded-xl p-2.5 text-sm"
+                  />
+                  <div className="text-2xl p-1 bg-gray-50 rounded-xl border flex items-center justify-center min-w-[42px] min-h-[42px]">
+                    {subcategoryForm.icon || getSubcategoryEmoji(subcategoryForm.name)}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border rounded-xl max-h-24 overflow-y-auto">
+                  {PRESET_EMOJIS.slice(0, 24).map(em => (
+                    <button
+                      key={em}
+                      type="button"
+                      onClick={() => setSubcategoryForm({ ...subcategoryForm, icon: em })}
+                      className={`text-base p-1.5 rounded-lg hover:bg-white hover:scale-115 transition ${
+                        subcategoryForm.icon === em ? 'bg-red-100 ring-2 ring-red-400' : 'bg-white/70'
+                      }`}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Live Preview */}
+              <div className="p-3 bg-red-50/60 rounded-2xl border border-red-200/80 space-y-1">
+                <span className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                  লাইভ প্রিভিউ (ড্রপডাউনে যেমন দেখাবে):
+                </span>
+                <div className="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 font-bold text-gray-800 text-xs">
+                  <span className="text-base leading-none">
+                    {subcategoryForm.icon || getSubcategoryEmoji(subcategoryForm.name)}
+                  </span>
+                  <span>{subcategoryForm.name || 'Subcategory Name'}</span>
+                </div>
+              </div>
+
               <button type="submit" className="w-full bg-gradient-to-r from-[#990011] to-[#C8102E] text-white py-3 rounded-xl font-bold shadow hover:opacity-95 transition cursor-pointer">
                 Save Subcategory (সংরক্ষণ করুন)
               </button>

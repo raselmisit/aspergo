@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Android / Mobile local build artifacts
+client/android/.gradle/
+client/android/app/build/
+client/android/build/
+client/android/local.properties
+
+# Scratch & Temporary
+scratch/
+.system_generated/
+*.lnk
+
+# SQLite temporary wal/shm
+server/*.db-shm
+server/*.db-wal

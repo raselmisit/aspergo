@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShoppingBag, Flame, Sparkles, Filter, SlidersHorizontal, 
   ArrowUpDown, Grid, CheckCircle2, Truck, ShieldCheck, Home, 
-  User, RefreshCw
+  User, RefreshCw, Smartphone
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
 import { api } from './api';
+import { getCategoryEmoji } from './utils/categoryEmojis';
 
 import Header from './components/Header';
 import HeroSlider from './components/HeroSlider';
@@ -18,10 +19,14 @@ import FastCheckoutModal from './components/FastCheckoutModal';
 import OrderSuccessModal from './components/OrderSuccessModal';
 import OrderTracker from './components/OrderTracker';
 import AuthModal from './components/AuthModal';
+import MobileAppInstallModal from './components/MobileAppInstallModal';
+import AIAssistantChat from './components/AIAssistantChat';
 import Footer from './components/Footer';
 
 import AdminDashboard from './pages/AdminDashboard';
 import CustomerAccount from './pages/CustomerAccount';
+import LandingPageView from './pages/LandingPageView';
+import { pixelTracker } from './utils/pixelTracker';
 
 function StoreApp() {
   const { user, isAdminOrManager, setAuthModalOpen } = useAuth();
@@ -36,7 +41,34 @@ function StoreApp() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   
   const [sortBy, setSortBy] = useState('popular');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [appInstallModalOpen, setAppInstallModalOpen] = useState(false);
+
+  // Landing Page Route state
+  const [landingSlug, setLandingSlug] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#landing/')) {
+      return window.location.hash.replace('#landing/', '');
+    }
+    return null;
+  });
+
+  // Initialize Marketing Pixels & listen to hash changes
+  useEffect(() => {
+    pixelTracker.init();
+    pixelTracker.trackPageView(document.title);
+
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#landing/')) {
+        setLandingSlug(hash.replace('#landing/', ''));
+      } else {
+        setLandingSlug(null);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Fetch initial categories
   useEffect(() => {
@@ -45,12 +77,16 @@ function StoreApp() {
       .catch(console.error);
   }, []);
 
-  // Fetch products whenever selectedCategory or sortBy changes
+  // Fetch products whenever selectedCategory, sortBy or searchQuery changes
   useEffect(() => {
     if (currentView !== 'shop') return;
     
     setLoadingProducts(true);
     const params = { sort: sortBy, limit: 60 };
+
+    if (searchQuery && searchQuery.trim()) {
+      params.search = searchQuery.trim();
+    }
 
     if (selectedCategory === 'flash-deals') {
       params.flash_deal = '1';
@@ -64,13 +100,50 @@ function StoreApp() {
       })
       .catch(console.error)
       .finally(() => setLoadingProducts(false));
-  }, [selectedCategory, sortBy, currentView]);
+  }, [selectedCategory, sortBy, searchQuery, currentView]);
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setCurrentView('shop');
+    setSelectedCategory(null);
+    setTimeout(() => {
+      const catalogEl = document.getElementById('main-catalog');
+      if (catalogEl) {
+        catalogEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+  };
 
   const handleTrackOrderFromAnywhere = (orderNum) => {
     setTrackingQuery(orderNum);
     setCurrentView('track');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // If viewing a standalone landing page
+  if (landingSlug) {
+    return (
+      <>
+        <LandingPageView
+          slug={landingSlug}
+          onOrderSuccess={(orderNum) => {
+            window.location.hash = '';
+            setLandingSlug(null);
+            handleTrackOrderFromAnywhere(orderNum);
+          }}
+          onBackToStore={() => {
+            window.location.hash = '';
+            setLandingSlug(null);
+          }}
+        />
+        <AIAssistantChat />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FA] text-[#1A1A1A] antialiased pb-16 md:pb-0">
@@ -81,15 +154,19 @@ function StoreApp() {
         setCurrentView={setCurrentView}
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onSearch={handleSearch}
         onProductClick={(prod) => setSelectedProduct(prod)}
+        onAppInstallClick={() => setAppInstallModalOpen(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1">
         {currentView === 'shop' && (
           <div>
-            {/* Show Hero Slider and Flash Deals on default home catalog */}
-            {!selectedCategory && (
+            {/* Show Hero Slider and Flash Deals on default home catalog (when not searching or filtering) */}
+            {!selectedCategory && !searchQuery && (
               <>
                 <HeroSlider 
                   onExploreClick={() => {
@@ -118,19 +195,50 @@ function StoreApp() {
                   </div>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <h2 className="text-base sm:text-xl font-black text-slate-900 tracking-tight">
-                        {selectedCategory === 'flash-deals' 
-                          ? '🔥 Mega Flash Deal Specials' 
-                          : selectedCategory 
-                            ? categories.find(c => c.slug === selectedCategory)?.name || 'Selected Category'
-                            : 'Explore Trending Products'}
+                      <h2 className="text-base sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
+                        {searchQuery ? (
+                          <>
+                            <span className="text-xl">🔍</span>
+                            <span>অনুসন্ধান: "{searchQuery}"</span>
+                            <button
+                              onClick={handleClearSearch}
+                              className="text-xs bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-[#C8102E] px-2.5 py-0.5 rounded-full font-bold transition cursor-pointer border border-slate-200"
+                            >
+                              ✕ ক্লিয়ার
+                            </button>
+                          </>
+                        ) : selectedCategory === 'flash-deals' ? (
+                          <>
+                            <span>🔥</span>
+                            <span>Mega Flash Deal Specials</span>
+                          </>
+                        ) : selectedCategory ? (
+                          (() => {
+                            const foundCat = categories.find(c => c.slug === selectedCategory);
+                            return (
+                              <>
+                                <span className="text-xl leading-none filter drop-shadow-xs">
+                                  {getCategoryEmoji(foundCat?.name, foundCat?.icon)}
+                                </span>
+                                <span>{foundCat?.name || 'Selected Category'}</span>
+                              </>
+                            );
+                          })()
+                        ) : (
+                          <>
+                            <span>🛍️</span>
+                            <span>Explore Trending Products</span>
+                          </>
+                        )}
                       </h2>
                       <span className="bg-red-50 text-[#C8102E] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border border-red-200/50">
                         {products.length} Products
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                      100% Authentic quality assured items with 24-48h fast nationwide delivery
+                      {searchQuery 
+                        ? 'পণ্যের নাম, ক্যাটাগরি বা সাব-ক্যাটাগরি অনুযায়ী প্রাপ্ত পণ্যের তালিকা' 
+                        : '100% Authentic quality assured items with 24-48h fast nationwide delivery'}
                     </p>
                   </div>
                 </div>
@@ -162,13 +270,20 @@ function StoreApp() {
               ) : products.length === 0 ? (
                 <div className="bg-white rounded-3xl p-12 text-center border border-gray-200 max-w-md mx-auto my-8">
                   <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <h3 className="text-base font-bold text-gray-800">No products found</h3>
-                  <p className="text-xs text-gray-500 mt-1">Try selecting another category or clear filter</p>
+                  <h3 className="text-base font-bold text-gray-800">
+                    {searchQuery ? `"${searchQuery}" এর জন্য কোনো পণ্য পাওয়া যায়নি` : 'No products found'}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {searchQuery ? 'ক্যাটাগরি (ASPER MOTORS, Electronics, Fashion) বা পণ্যের অন্য নাম দিয়ে চেষ্টা করুন' : 'Try selecting another category or clear filter'}
+                  </p>
                   <button
-                    onClick={() => setSelectedCategory(null)}
-                    className="mt-4 bg-asper-gradient text-white px-4 py-2 rounded-xl text-xs font-bold"
+                    onClick={() => {
+                      setSelectedCategory(null);
+                      setSearchQuery('');
+                    }}
+                    className="mt-4 bg-asper-gradient text-white px-5 py-2.5 rounded-xl text-xs font-bold cursor-pointer hover:opacity-95 transition"
                   >
-                    View All Products
+                    সকল পণ্য দেখুন (View All)
                   </button>
                 </div>
               ) : (
@@ -198,7 +313,13 @@ function StoreApp() {
 
         {/* View: Admin & Manager Dashboard */}
         {currentView === 'admin' && isAdminOrManager && (
-          <AdminDashboard onBackToStore={() => setCurrentView('shop')} />
+          <AdminDashboard 
+            onBackToStore={() => setCurrentView('shop')}
+            onOpenLandingPage={(slug) => {
+              window.location.hash = `#landing/${slug}`;
+              setLandingSlug(slug);
+            }}
+          />
         )}
       </main>
 
@@ -219,8 +340,16 @@ function StoreApp() {
 
       <AuthModal />
 
+      <MobileAppInstallModal
+        isOpen={appInstallModalOpen}
+        onClose={() => setAppInstallModalOpen(false)}
+      />
+
+      {/* Floating Storefront AI Assistant */}
+      <AIAssistantChat />
+
       {/* Mobile Bottom Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 py-2 px-4 flex items-center justify-around shadow-2xl">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 py-2 px-3 flex items-center justify-around shadow-2xl">
         <button
           onClick={() => {
             setCurrentView('shop');
@@ -247,6 +376,18 @@ function StoreApp() {
         >
           <Flame className="w-5 h-5 mb-0.5" />
           <span>Flash Sale</span>
+        </button>
+
+        {/* Mobile App Button */}
+        <button
+          onClick={() => setAppInstallModalOpen(true)}
+          className="flex flex-col items-center text-[10px] font-bold text-amber-600 hover:text-amber-700"
+        >
+          <div className="relative p-1 bg-amber-100 rounded-lg">
+            <Smartphone className="w-4 h-4 text-amber-700" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
+          </div>
+          <span className="mt-0.5 font-extrabold text-[9px] text-amber-700">App</span>
         </button>
 
         <button

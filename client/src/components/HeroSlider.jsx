@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles, ShieldCheck, Truck, RefreshCw, Zap } from 'lucide-react';
-import { api } from '../api';
+import { api, formatImageUrl } from '../api';
 
 export default function HeroSlider({ onExploreClick }) {
   const [banners, setBanners] = useState([]);
@@ -97,7 +97,7 @@ export default function HeroSlider({ onExploreClick }) {
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-amber-600 rounded-2xl blur-xl opacity-60 group-hover:opacity-100 transition duration-1000"></div>
               <img
-                src={currentBanner.image || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80'}
+                src={formatImageUrl(currentBanner.image) || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80'}
                 alt="ASPER GO Featured"
                 className="relative rounded-2xl shadow-2xl object-cover w-72 h-56 sm:w-96 sm:h-72 border-2 border-white/20 transform group-hover:scale-102 transition duration-500"
               />

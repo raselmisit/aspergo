@@ -114,6 +114,20 @@ function initDatabase() {
     // Column already exists, ignore
   }
 
+  // Safely add icon column to subcategories
+  try {
+    db.exec(`ALTER TABLE subcategories ADD COLUMN icon TEXT;`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
+  // Safely add icon column to sub_subcategories
+  try {
+    db.exec(`ALTER TABLE sub_subcategories ADD COLUMN icon TEXT;`);
+  } catch (e) {
+    // Column already exists, ignore
+  }
+
   // Create Orders table
   db.exec(`
     CREATE TABLE IF NOT EXISTS orders (
@@ -182,6 +196,43 @@ function initDatabase() {
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+  `);
+
+  // Create Landing Pages table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS landing_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER,
+      title TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      headline TEXT NOT NULL,
+      subheadline TEXT,
+      video_url TEXT,
+      banner_image TEXT,
+      features TEXT,
+      reviews TEXT,
+      urgent_timer_minutes INTEGER DEFAULT 30,
+      discount_badge TEXT,
+      theme_color TEXT DEFAULT '#C8102E',
+      status TEXT DEFAULT 'active',
+      views INTEGER DEFAULT 0,
+      orders_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+    );
+  `);
+
+  // Create Delivery Zones table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS delivery_zones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      charge REAL NOT NULL DEFAULT 60,
+      estimated_time TEXT DEFAULT '24-48 Hours',
+      is_active INTEGER DEFAULT 1,
+      display_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
@@ -484,6 +535,104 @@ function seedInitialData() {
   insertSetting.run('outside_dhaka_delivery', '120');
   insertSetting.run('bkash_number', '01700000000 (Merchant/Personal)');
   insertSetting.run('nagad_number', '01700000000 (Personal)');
+  insertSetting.run('pixel_meta_id', '');
+  insertSetting.run('pixel_tiktok_id', '');
+  insertSetting.run('pixel_google_tag_id', '');
+  insertSetting.run('custom_header_scripts', '');
+  insertSetting.run('custom_body_scripts', '');
+  insertSetting.run('ai_gemini_api_key', '');
+
+  // Seed initial landing page if table is empty
+  const landingCount = db.prepare('SELECT COUNT(*) as count FROM landing_pages').get().count;
+  if (landingCount === 0) {
+    const firstProduct = db.prepare('SELECT id, title, price, discount_price, image FROM products LIMIT 1').get();
+    if (firstProduct) {
+      const insertLanding = db.prepare(`
+        INSERT INTO landing_pages (
+          product_id, title, slug, headline, subheadline, banner_image, 
+          features, reviews, urgent_timer_minutes, discount_badge, theme_color, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      insertLanding.run(
+        firstProduct.id,
+        `${firstProduct.title} - স্পেশাল অফার`,
+        'special-offer',
+        'সীমিত সময়ের জন্য বিশেষ ৫০% পর্যন্ত ছাড় ও ফ্রি ডেলিভারি অফার!',
+        'হাতে পেয়ে চেক করে সম্পূর্ণ ক্যাশ অন ডেলিভারিতে মূল্য পরিশোধের ১০০% গ্যারান্টি। আজই অর্ডার কনফার্ম করুন।',
+        firstProduct.image,
+        JSON.stringify([
+          '১০০% প্রিমিয়াম অরিজিনাল ও অথেনটিক কোয়ালিটি',
+          'সারা বাংলাদেশে মাত্র ২৪ থেকে ৪৮ ঘণ্টায় হোম ডেলিভারি',
+          'পণ্য দেখে মূল্য পরিশোধ — ক্যাশ অন ডেলিভারি সুবিধা',
+          '৭ দিনের সহজ রিপ্লেসমেন্ট ও অফিসিয়াল ওয়ারেন্টি গ্যারান্টি'
+        ]),
+        JSON.stringify([
+          { name: 'তানভীর আহমেদ', location: 'উত্তরা, ঢাকা', rating: 5, comment: 'অসাধারণ কোয়ালিটি! ডেলিভারিও পেয়েছি মাত্র ২৪ ঘণ্টায়। সেলারের ব্যবহার চমৎকার।' },
+          { name: 'সাদিয়া আক্তার', location: 'চট্টগ্রাম', rating: 5, comment: 'প্যাকেজিং খুবই সুন্দর ছিল এবং প্রোডাক্ট ঠিক যেমন ছবিতে দেখেছি তেমনটাই পেয়েছি।' }
+        ]),
+        25,
+        '৫০% মেগা ডিসকাউন্ট',
+        '#C8102E',
+        'active'
+      );
+    }
+  }
+
+  // Seed default delivery zones if table is empty
+  const zoneCount = db.prepare('SELECT COUNT(*) as count FROM delivery_zones').get().count;
+  if (zoneCount === 0) {
+    const insertZone = db.prepare(`
+      INSERT INTO delivery_zones (name, charge, estimated_time, is_active, display_order)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    insertZone.run('Inside Saidpur (সৈয়দপুর সিটি)', 40, '১২-২৪ ঘণ্টা', 1, 1);
+    insertZone.run('Rangpur Division (রংপুর বিভাগ)', 80, '২৪-৪৮ ঘণ্টা', 1, 2);
+    insertZone.run('Inside Dhaka (ঢাকা সিটি)', 60, '২৪-৪৮ ঘণ্টা', 1, 3);
+    insertZone.run('All Bangladesh (সারা বাংলাদেশ)', 120, '৪৮-৭২ ঘণ্টা', 1, 4);
+  }
+
+  // Ensure rich emojis for all main categories
+  const categoryEmojiMap = {
+    'asper-motors': '🏍️',
+    'electronics-gadgets': '📱',
+    'fashion-lifestyle': '👗',
+    'home-kitchen': '🍳',
+    'groceries-express': '🛒',
+    'beauty-personal-care': '💄'
+  };
+
+  const updateCatEmoji = db.prepare('UPDATE categories SET icon = ? WHERE slug = ?');
+  for (const [slug, emoji] of Object.entries(categoryEmojiMap)) {
+    updateCatEmoji.run(emoji, slug);
+  }
+
+  // Ensure rich emojis for subcategories
+  const subcategoryEmojiMap = {
+    'helmats': '🪖',
+    'raincote': '🌧️',
+    'dustcote': '🧥',
+    'engin-oil': '🛢️',
+    'lock': '🔒',
+    'earbuds-headphones': '🎧',
+    'smartwatches': '⌚',
+    'chargers-powerbanks': '🔋',
+    'speakers': '🔊',
+    'mens-tshirts': '👕',
+    'womens-fashion': '👗',
+    'bags-wallets': '👜',
+    'kitchen-appliances': '🍳',
+    'decor-lighting': '💡',
+    'cleaning-organizers': '🧹',
+    'tea-coffee-honey': '☕',
+    'dry-fruits': '🥜',
+    'skincare': '🧴',
+    'men-grooming': '🪒'
+  };
+
+  const updateSubEmoji = db.prepare('UPDATE subcategories SET icon = ? WHERE slug = ?');
+  for (const [slug, emoji] of Object.entries(subcategoryEmojiMap)) {
+    updateSubEmoji.run(emoji, slug);
+  }
 }
 
 module.exports = {

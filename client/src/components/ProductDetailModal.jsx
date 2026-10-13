@@ -5,6 +5,7 @@ import {
   Play, Video, ChevronLeft, ChevronRight, Image as ImageIcon
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { formatImageUrl } from '../api';
 
 export default function ProductDetailModal({ product, onClose }) {
   const { addToCart, buyNowDirect } = useCart();
@@ -26,7 +27,7 @@ export default function ProductDetailModal({ product, onClose }) {
   const allImages = [
     product?.image,
     ...galleryArray.filter(img => img && img !== product?.image)
-  ].filter(Boolean);
+  ].filter(Boolean).map(formatImageUrl);
 
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [showVideo, setShowVideo] = useState(false);
@@ -83,7 +84,7 @@ export default function ProductDetailModal({ product, onClose }) {
                     />
                   ) : (
                     <video
-                      src={product.video_url}
+                      src={formatImageUrl(product.video_url)}
                       controls
                       autoPlay
                       className="w-full h-full object-contain"

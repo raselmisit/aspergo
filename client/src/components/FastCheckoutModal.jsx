@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../api';
+import { api, formatImageUrl } from '../api';
 
 export default function FastCheckoutModal() {
   const { 
@@ -32,6 +32,7 @@ export default function FastCheckoutModal() {
     notes: ''
   });
 
+  const [deliveryZones, setDeliveryZones] = useState([]);
   const [settings, setSettings] = useState({
     inside_dhaka_delivery: '60',
     outside_dhaka_delivery: '120',
@@ -54,11 +55,21 @@ export default function FastCheckoutModal() {
   }, [user]);
 
   useEffect(() => {
-    api.getSettings()
-      .then(res => {
-        if (res.settings) setSettings(res.settings);
-      })
-      .catch(console.error);
+    Promise.all([
+      api.getSettings().catch(() => ({})),
+      api.getDeliveryZones().catch(() => ({ zones: [] }))
+    ]).then(([setRes, zoneRes]) => {
+      if (setRes.settings) setSettings(setRes.settings);
+      const zones = zoneRes.zones || [];
+      setDeliveryZones(zones);
+      if (zones.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          district: zones[0].name,
+          delivery_fee: Number(zones[0].charge)
+        }));
+      }
+    });
   }, []);
 
   if (!checkoutModalOpen) return null;
@@ -85,6 +96,14 @@ export default function FastCheckoutModal() {
     : cartSubtotal;
 
   const totalAmount = subtotal + Number(formData.delivery_fee);
+
+  const handleDeliveryZoneSelect = (zone) => {
+    setFormData(prev => ({
+      ...prev,
+      district: zone.name,
+      delivery_fee: Number(zone.charge)
+    }));
+  };
 
   const handleDeliveryAreaChange = (area) => {
     const fee = area === 'Inside Dhaka' 
@@ -253,38 +272,61 @@ export default function FastCheckoutModal() {
               <label className="block text-xs font-bold text-gray-700 mb-1">
                 ডেলিভারি এরিয়া (Delivery Area) *
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDeliveryAreaChange('Inside Dhaka')}
-                  className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between transition ${
-                    formData.district === 'Inside Dhaka'
-                      ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
-                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <div className="text-left">
-                    <div>ঢাকার ভিতরে (Inside Dhaka)</div>
-                    <div className="text-[10px] text-gray-500 font-normal">24 Hours Delivery</div>
-                  </div>
-                  <span className="text-sm font-black">৳{settings.inside_dhaka_delivery || 60}</span>
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {deliveryZones.length > 0 ? (
+                  deliveryZones.map((zone) => (
+                    <button
+                      key={zone.id}
+                      type="button"
+                      onClick={() => handleDeliveryZoneSelect(zone)}
+                      className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between transition cursor-pointer ${
+                        formData.district === zone.name
+                          ? 'border-[#C8102E] bg-red-50 text-[#C8102E] ring-1 ring-[#C8102E]'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="text-left">
+                        <div className="leading-snug">{zone.name}</div>
+                        <div className="text-[10px] text-gray-500 font-normal">{zone.estimated_time || '২৪-৪৮ ঘণ্টা'}</div>
+                      </div>
+                      <span className="text-sm font-black ml-2">৳{zone.charge}</span>
+                    </button>
+                  ))
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleDeliveryAreaChange('Inside Dhaka')}
+                      className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between transition ${
+                        formData.district === 'Inside Dhaka'
+                          ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="text-left">
+                        <div>ঢাকার ভিতরে (Inside Dhaka)</div>
+                        <div className="text-[10px] text-gray-500 font-normal">24 Hours Delivery</div>
+                      </div>
+                      <span className="text-sm font-black">৳{settings.inside_dhaka_delivery || 60}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleDeliveryAreaChange('Outside Dhaka')}
-                  className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between transition ${
-                    formData.district === 'Outside Dhaka'
-                      ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
-                      : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <div className="text-left">
-                    <div>ঢাকার বাইরে (All Bangladesh)</div>
-                    <div className="text-[10px] text-gray-500 font-normal">24-48 Hours Delivery</div>
-                  </div>
-                  <span className="text-sm font-black">৳{settings.outside_dhaka_delivery || 120}</span>
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeliveryAreaChange('Outside Dhaka')}
+                      className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between transition ${
+                        formData.district === 'Outside Dhaka'
+                          ? 'border-[#C8102E] bg-red-50 text-[#C8102E]'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="text-left">
+                        <div>ঢাকার বাইরে (All Bangladesh)</div>
+                        <div className="text-[10px] text-gray-500 font-normal">24-48 Hours Delivery</div>
+                      </div>
+                      <span className="text-sm font-black">৳{settings.outside_dhaka_delivery || 120}</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -381,7 +423,7 @@ export default function FastCheckoutModal() {
               {checkoutItems.map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between text-xs">
                   <div className="flex items-center space-x-2 truncate">
-                    <img src={item.image} alt={item.title} className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                    <img src={formatImageUrl(item.image)} alt={item.title} className="w-8 h-8 rounded object-cover flex-shrink-0" />
                     <span className="font-semibold text-gray-800 truncate">{item.title} (x{item.quantity})</span>
                   </div>
                   <span className="font-bold text-gray-900 ml-2">৳{item.unit_price * item.quantity}</span>

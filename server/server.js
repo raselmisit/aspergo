@@ -272,19 +272,19 @@ app.delete('/api/categories/:id', authenticateToken, requireRole(['super_admin',
 // Admin/Manager: Create Subcategory
 app.post('/api/subcategories', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
   try {
-    const { category_id, name, description } = req.body;
+    const { category_id, name, icon, description } = req.body;
     if (!category_id || !name) return res.status(400).json({ error: 'Category ID and Name are required' });
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const stmt = db.prepare(`
-      INSERT INTO subcategories (category_id, name, slug, description)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO subcategories (category_id, name, slug, icon, description)
+      VALUES (?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(category_id, name, slug, description || '');
+    const result = stmt.run(category_id, name, slug, icon || '', description || '');
 
     res.status(201).json({
       message: 'Subcategory created successfully',
-      subcategory: { id: result.lastInsertRowid, category_id, name, slug, description }
+      subcategory: { id: result.lastInsertRowid, category_id, name, slug, icon, description }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -304,19 +304,19 @@ app.delete('/api/subcategories/:id', authenticateToken, requireRole(['super_admi
 // Admin/Manager: Create Sub-Subcategory (Child Category)
 app.post('/api/sub-subcategories', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
   try {
-    const { subcategory_id, name, description } = req.body;
+    const { subcategory_id, name, icon, description } = req.body;
     if (!subcategory_id || !name) return res.status(400).json({ error: 'Subcategory ID and Name are required' });
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const stmt = db.prepare(`
-      INSERT INTO sub_subcategories (subcategory_id, name, slug, description)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO sub_subcategories (subcategory_id, name, slug, icon, description)
+      VALUES (?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(subcategory_id, name, slug, description || '');
+    const result = stmt.run(subcategory_id, name, slug, icon || '', description || '');
 
     res.status(201).json({
       message: 'Sub-Subcategory created successfully',
-      sub_subcategory: { id: result.lastInsertRowid, subcategory_id, name, slug, description }
+      sub_subcategory: { id: result.lastInsertRowid, subcategory_id, name, slug, icon, description }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -367,9 +367,23 @@ app.get('/api/products', (req, res) => {
       params.push(sub_subcategory, sub_subcategory);
     }
 
-    if (search) {
-      query += ' AND (p.title LIKE ? OR p.description LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
+    if (search && search.trim()) {
+      const rawSearch = search.trim();
+      const terms = rawSearch.split(/\s+/).filter(Boolean);
+      for (const term of terms) {
+        query += ` AND (
+          p.title LIKE ? OR 
+          p.description LIKE ? OR 
+          c.name LIKE ? OR 
+          c.slug LIKE ? OR 
+          sc.name LIKE ? OR 
+          sc.slug LIKE ? OR 
+          ssc.name LIKE ? OR 
+          ssc.slug LIKE ?
+        )`;
+        const likeTerm = `%${term}%`;
+        params.push(likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm, likeTerm);
+      }
     }
 
     if (featured === '1' || featured === 'true') {
@@ -416,22 +430,21 @@ app.get('/api/products/:identifier', (req, res) => {
   try {
     const { identifier } = req.params;
     let product;
+    const baseQuery = `
+      SELECT p.*, 
+             c.name as category_name, c.slug as category_slug, c.icon as category_icon,
+             sc.name as subcategory_name, sc.slug as subcategory_slug, sc.icon as subcategory_icon,
+             ssc.name as sub_subcategory_name, ssc.slug as sub_subcategory_slug, ssc.icon as sub_subcategory_icon
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN subcategories sc ON p.subcategory_id = sc.id
+      LEFT JOIN sub_subcategories ssc ON p.sub_subcategory_id = ssc.id
+    `;
+
     if (isNaN(identifier)) {
-      product = db.prepare(`
-        SELECT p.*, c.name as category_name, c.slug as category_slug, sc.name as subcategory_name
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        LEFT JOIN subcategories sc ON p.subcategory_id = sc.id
-        WHERE p.slug = ?
-      `).get(identifier);
+      product = db.prepare(`${baseQuery} WHERE p.slug = ?`).get(identifier);
     } else {
-      product = db.prepare(`
-        SELECT p.*, c.name as category_name, c.slug as category_slug, sc.name as subcategory_name
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        LEFT JOIN subcategories sc ON p.subcategory_id = sc.id
-        WHERE p.id = ?
-      `).get(identifier);
+      product = db.prepare(`${baseQuery} WHERE p.id = ?`).get(Number(identifier));
     }
 
     if (!product) return res.status(404).json({ error: 'Product not found' });
@@ -975,6 +988,458 @@ app.put('/api/settings', authenticateToken, requireRole(['super_admin']), (req, 
       updateStmt.run(key, String(value));
     }
     res.json({ message: 'Settings updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== DELIVERY ZONES ROUTES ====================
+// Get delivery zones (if ?all=1 returns all, else returns only active ones)
+app.get('/api/delivery-zones', (req, res) => {
+  try {
+    const showAll = req.query.all === '1' || req.query.all === 'true';
+    const query = showAll
+      ? 'SELECT * FROM delivery_zones ORDER BY display_order ASC, id ASC'
+      : 'SELECT * FROM delivery_zones WHERE is_active = 1 ORDER BY display_order ASC, id ASC';
+    const zones = db.prepare(query).all();
+    res.json({ zones });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new delivery zone
+app.post('/api/delivery-zones', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const { name, charge, estimated_time, is_active } = req.body;
+    if (!name || charge === undefined) {
+      return res.status(400).json({ error: 'Zone name and delivery charge are required' });
+    }
+
+    const maxOrder = db.prepare('SELECT MAX(display_order) as m FROM delivery_zones').get().m || 0;
+    const insertStmt = db.prepare(`
+      INSERT INTO delivery_zones (name, charge, estimated_time, is_active, display_order)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    const result = insertStmt.run(
+      name.trim(),
+      Number(charge) || 0,
+      estimated_time || '24-48 Hours',
+      is_active !== undefined ? (is_active ? 1 : 0) : 1,
+      maxOrder + 1
+    );
+
+    res.status(201).json({
+      message: 'Delivery zone created successfully',
+      id: result.lastInsertRowid
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update delivery zone
+app.put('/api/delivery-zones/:id', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, charge, estimated_time, is_active, display_order } = req.body;
+
+    const updateStmt = db.prepare(`
+      UPDATE delivery_zones SET
+        name = COALESCE(?, name),
+        charge = COALESCE(?, charge),
+        estimated_time = COALESCE(?, estimated_time),
+        is_active = COALESCE(?, is_active),
+        display_order = COALESCE(?, display_order)
+      WHERE id = ?
+    `);
+
+    updateStmt.run(
+      name ? name.trim() : null,
+      charge !== undefined ? Number(charge) : null,
+      estimated_time !== undefined ? estimated_time : null,
+      is_active !== undefined ? (is_active ? 1 : 0) : null,
+      display_order !== undefined ? Number(display_order) : null,
+      id
+    );
+
+    res.json({ message: 'Delivery zone updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Toggle delivery zone On/Off
+app.patch('/api/delivery-zones/:id/toggle', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const { id } = req.params;
+    const zone = db.prepare('SELECT is_active FROM delivery_zones WHERE id = ?').get(id);
+    if (!zone) {
+      return res.status(404).json({ error: 'Delivery zone not found' });
+    }
+
+    const newStatus = zone.is_active === 1 ? 0 : 1;
+    db.prepare('UPDATE delivery_zones SET is_active = ? WHERE id = ?').run(newStatus, id);
+    res.json({ 
+      message: `Delivery zone ${newStatus === 1 ? 'activated (চালু)' : 'deactivated (বন্ধ)'}`, 
+      is_active: newStatus 
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete delivery zone
+app.delete('/api/delivery-zones/:id', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM delivery_zones WHERE id = ?').run(id);
+    res.json({ message: 'Delivery zone deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== LANDING PAGES ROUTES ====================
+// Get all landing pages
+app.get('/api/landing-pages', (req, res) => {
+  try {
+    const pages = db.prepare(`
+      SELECT lp.*, p.title as product_title, p.price, p.discount_price, p.stock, p.image as product_image
+      FROM landing_pages lp
+      LEFT JOIN products p ON lp.product_id = p.id
+      ORDER BY lp.id DESC
+    `).all();
+    res.json({ pages });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get single landing page by slug or id
+app.get('/api/landing-pages/:slugOrId', (req, res) => {
+  try {
+    const { slugOrId } = req.params;
+    const page = db.prepare(`
+      SELECT lp.*, p.title as product_title, p.price, p.discount_price, p.stock, 
+             p.image as product_image, p.gallery as product_gallery, p.video_url as product_video_url,
+             p.cost_price, p.description as product_description
+      FROM landing_pages lp
+      LEFT JOIN products p ON lp.product_id = p.id
+      WHERE lp.slug = ? OR lp.id = ?
+    `).get(slugOrId, slugOrId);
+
+    if (!page) {
+      return res.status(404).json({ error: 'Landing page not found' });
+    }
+
+    res.json({ page });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create landing page
+app.post('/api/landing-pages', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const {
+      product_id, title, slug, headline, subheadline, video_url,
+      banner_image, features, reviews, urgent_timer_minutes,
+      discount_badge, theme_color, status
+    } = req.body;
+
+    if (!title || !slug || !headline) {
+      return res.status(400).json({ error: 'Title, slug, and headline are required' });
+    }
+
+    // Check slug uniqueness
+    const existing = db.prepare('SELECT id FROM landing_pages WHERE slug = ?').get(slug);
+    if (existing) {
+      return res.status(400).json({ error: 'A landing page with this URL slug already exists' });
+    }
+
+    const insertStmt = db.prepare(`
+      INSERT INTO landing_pages (
+        product_id, title, slug, headline, subheadline, video_url,
+        banner_image, features, reviews, urgent_timer_minutes,
+        discount_badge, theme_color, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = insertStmt.run(
+      product_id || null,
+      title,
+      slug,
+      headline,
+      subheadline || '',
+      video_url || null,
+      banner_image || null,
+      typeof features === 'object' ? JSON.stringify(features) : (features || '[]'),
+      typeof reviews === 'object' ? JSON.stringify(reviews) : (reviews || '[]'),
+      urgent_timer_minutes || 30,
+      discount_badge || '',
+      theme_color || '#C8102E',
+      status || 'active'
+    );
+
+    res.status(201).json({
+      message: 'Landing page created successfully',
+      landingPageId: result.lastInsertRowid
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update landing page
+app.put('/api/landing-pages/:id', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      product_id, title, slug, headline, subheadline, video_url,
+      banner_image, features, reviews, urgent_timer_minutes,
+      discount_badge, theme_color, status
+    } = req.body;
+
+    // Check slug uniqueness excluding this record
+    if (slug) {
+      const existing = db.prepare('SELECT id FROM landing_pages WHERE slug = ? AND id != ?').get(slug, id);
+      if (existing) {
+        return res.status(400).json({ error: 'Slug is already used by another landing page' });
+      }
+    }
+
+    const updateStmt = db.prepare(`
+      UPDATE landing_pages SET
+        product_id = COALESCE(?, product_id),
+        title = COALESCE(?, title),
+        slug = COALESCE(?, slug),
+        headline = COALESCE(?, headline),
+        subheadline = COALESCE(?, subheadline),
+        video_url = ?,
+        banner_image = ?,
+        features = ?,
+        reviews = ?,
+        urgent_timer_minutes = COALESCE(?, urgent_timer_minutes),
+        discount_badge = ?,
+        theme_color = COALESCE(?, theme_color),
+        status = COALESCE(?, status)
+      WHERE id = ?
+    `);
+
+    updateStmt.run(
+      product_id !== undefined ? product_id : null,
+      title,
+      slug,
+      headline,
+      subheadline,
+      video_url !== undefined ? video_url : null,
+      banner_image !== undefined ? banner_image : null,
+      typeof features === 'object' ? JSON.stringify(features) : (features || '[]'),
+      typeof reviews === 'object' ? JSON.stringify(reviews) : (reviews || '[]'),
+      urgent_timer_minutes,
+      discount_badge !== undefined ? discount_badge : '',
+      theme_color,
+      status,
+      id
+    );
+
+    res.json({ message: 'Landing page updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete landing page
+app.delete('/api/landing-pages/:id', authenticateToken, requireRole(['super_admin', 'manager']), (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM landing_pages WHERE id = ?').run(id);
+    res.json({ message: 'Landing page deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Increment landing page view count
+app.post('/api/landing-pages/:id/view', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('UPDATE landing_pages SET views = views + 1 WHERE id = ?').run(id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== AI AGENT ROUTES ====================
+// Expert Built-in E-Commerce AI Engine
+function generateExpertAIResponse(mode, prompt, context = {}) {
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
+  const productName = context.productName || 'স্মার্ট গ্যাজেট / প্রিমিয়াম প্রোডাক্ট';
+  const price = context.price || 1500;
+  const costPrice = context.costPrice || 850;
+
+  if (mode === 'marketing') {
+    return {
+      provider: 'aspergo_marketing_ai',
+      title: `${productName} — সিজনাল মার্কেটিং ও স্কেলিং স্ট্র্যাটেজি (${currentMonth} ২০২৬)`,
+      summary: `বর্তমান বাজার ও উৎসবের ট্রেন্ড অনুযায়ী কনভার্সন বৃদ্ধির জন্য একটি হাই-কনভার্টিং সেলস ফানেল তৈরি করা হয়েছে।`,
+      sections: [
+        {
+          heading: '🎯 টার্গেট অডিয়েন্স (Target Audience)',
+          points: [
+            'বয়স: ১৮ থেকে ৩৬ বছর (পুরুষ ও মহিলা)',
+            'লোকেশন: ঢাকা, চট্টগ্রাম, সিলেট, রাজশাহী ও খুলনা মেট্রো এলাকা',
+            'আগ্রহ (Interests): অনলাইন শপিং, টেক গ্যাজেট, ট্রেন্ডিং ফ্যাশন, Daraz/AliExpress/Facebook শপার্স',
+            'ডিভাইস: অ্যান্ড্রয়েড ও আইফোন ইউজার্স (সরাসরি ১-ক্লিক মোবাইল চেকআউট টার্গেটিং)'
+          ]
+        },
+        {
+          heading: '💰 বাজেট ও ক্যাম্পেইন ফানেল (Ad Budget & Funnel Strategy)',
+          points: [
+            'Top of Funnel (TOF - Cold Traffic): বাজেটের ৬০% — রিলস/টিকটক ভিডিও ও সমস্যা সমাধানের অ্যাড',
+            'Middle of Funnel (MOF - Consideration): বাজেটের ২৫% — আনবক্সিং, কাস্টমার রিভিউ ও সোশ্যাল প্রুফ',
+            'Bottom of Funnel (BOF - Retargeting): বাজেটের ১৫% — "সীমিত স্টক / ফ্রি ডেলিভারি" অফার দিয়ে কার্ট রি-টার্গেটিং',
+            'দৈনিক প্রস্তাবিত টেস্ট বাজেট: $১০ - $২৫ (১,২০০ - ৩,০০০ টাকা)'
+          ]
+        },
+        {
+          heading: '🚀 অফার ও কনভার্সন বুস্টার (Irresistible Offer Strategy)',
+          points: [
+            'কম্বো ডিল: "২টি কিনলে ডেলিভারি একদম ফ্রি + আকর্ষণীয় গিফট"',
+            'ক্যাশ অন ডেলিভারি নিশ্চয়তা: "হাতে পেয়ে পণ্য চেক করে তারপর টাকা পরিশোধ"',
+            'আর্জেন্ট টাইমার: ল্যান্ডিং পেজে ৩০ মিনিটের কাউন্টডাউন টাইমার দিয়ে ফোমো (FOMO) তৈরি'
+          ]
+        }
+      ]
+    };
+  }
+
+  if (mode === 'research') {
+    const profit = Math.max(0, price - costPrice);
+    const margin = price > 0 ? ((profit / price) * 100).toFixed(1) : 0;
+    const estRtoLoss = Math.round(price * 0.08);
+    const netProfit = Math.max(0, profit - estRtoLoss);
+
+    return {
+      provider: 'aspergo_research_ai',
+      title: `${productName} — প্রোডাক্ট রিসার্চ ও প্রফিট মার্জিন বিশ্লেষণ`,
+      score: '৯.৪ / ১০ (High Demand Potential)',
+      metrics: {
+        retailPrice: `৳${price}`,
+        costPrice: `৳${costPrice}`,
+        grossProfit: `৳${profit} (${margin}%)`,
+        estNetProfitPerOrder: `৳${netProfit}`,
+        marketCompetition: 'মাঝারি (Medium) — ক্রিয়েটিভ ভিডিও দিয়ে সহজেই ডমিনেট করা সম্ভব'
+      },
+      insights: [
+        '💡 ইউনিক সেলিং পয়েন্ট (USP): দৈনন্দিন সমস্যার সহজ সমাধান এবং প্রিমিয়াম লুক ও ফিনিশ।',
+        '📊 সিজনাল ডিমান্ড: বর্তমানে এই ধরণের পণ্যের চাহিদা সোশ্যাল মিডিয়ায় দ্রুত বৃদ্ধি পাচ্ছে।',
+        '📦 রিটার্ন রেশিও কন্ট্রোল (RTO Defense): অর্ডার প্লেস করার পর দ্রুত ফোন কল কনফার্মেশন ও ট্র্যাকিং এসএমএস পাঠালে ডেলিভারি সাকসেস রেট ৯০%+ নিশ্চিত করা সম্ভব।',
+        '🎯 প্রাইসিং টিপ: "৳' + price + '" দামটি সাইকোলজিক্যালি আকর্ষণীয়। এর সাথে ফ্রি ডেলিভারি যুক্ত করলে কনভার্সন ২০% বৃদ্ধি পাবে।'
+      ]
+    };
+  }
+
+  if (mode === 'ad_creator') {
+    return {
+      provider: 'aspergo_ad_ai',
+      title: `${productName} — ফেসবুক ও টিকটক হাই-কনভার্টিং অ্যাড কপি`,
+      hooks: [
+        '🔥 হুক ১ (প্রশ্ন ও কৌতূহল): "আপনিও কি খুঁজছেন এমন একটি প্রডাক্ট যা আপনার কাজকে করবে দ্বিগুণ সহজ?"',
+        '⚠️ হুক ২ (সমস্যা ও সমাধান): "বাজারের কমদামী নকল প্রডাক্ট কিনে প্রতারিত হচ্ছেন? এবার বেছে নিন ১০০% প্রিমিয়াম অরিজিনাল কোয়ালিটি!"',
+        '⚡ হুক ৩ (সীমিত অফার): "৫০% মেগা ডিসকাউন্ট অফার! হাতে পেয়ে দেখে মূল্য পরিশোধের সুবিধা সহ সারা বাংলাদেশে হোম ডেলিভারি!"'
+      ],
+      primaryText: `🔥 আকর্ষণীয় মেগা ডিসকাউন্ট অফারে পেয়ে যাচ্ছেন প্রিমিয়াম ${productName}!
+
+✅ ১০০% অরিজিনাল ও টেকসই প্রিমিয়াম কোয়ালিটি
+✅ ডেলিভারি ম্যানের সামনে চেক করে মূল্য পরিশোধের ১০০% গ্যারান্টি (Cash on Delivery)
+✅ সারা বাংলাদেশে মাত্র ২৪-৪৮ ঘণ্টায় ফাস্ট ডেলিভারি
+✅ ৭ দিনের সহজ রিপ্লেসমেন্ট গ্যারান্টি
+
+🎁 বিশেষ অফার: আজই অর্ডার করলে পাচ্ছেন বিশেষ ক্যাশব্যাক / ফ্রি হোম ডেলিভারি অফার!
+
+👉 দ্রুত অর্ডার করতে নিচের লিংকে ক্লিক করুন অথবা আমাদের ইনবক্স করুন:
+🛒 অর্ডার লিংক: https://aspergo.onrender.com
+
+📞 যেকোনো তথ্যের জন্য সরাসরি কল করুন: +8801700-000000`,
+      videoScript: [
+        { time: '0-3 sec (Hook)', action: 'পণ্যটির সেরা ফিচার বা প্রধান সমস্যার সমাধান চোখের পলকে দেখানো' },
+        { time: '3-10 sec (Pain & Agony)', action: 'সাধারণ পণ্যের ঝামেলা বনাম আমাদের প্রিমিয়াম পণ্যের পার্থক্য' },
+        { time: '10-20 sec (Live Demo)', action: 'প্রোডাক্টটি বাস্তবে কীভাবে কাজ করে তা দ্রুত ক্লিপে দেখানো' },
+        { time: '20-30 sec (Offer & CTA)', action: 'ক্যাশ অন ডেলিভারি লোগো সহ "Order Now" বাটনে ক্লিক করার আহ্বান' }
+      ],
+      hashtags: `#AsperGo #${productName.replace(/\\s+/g, '')} #OnlineShoppingBD #GadgetsBD #CashOnDelivery #BestDealsBD`
+    };
+  }
+
+  // mode === 'customer_support'
+  return {
+    provider: 'aspergo_support_ai',
+    reply: `হ্যালো! ASPER GO তে আপনাকে স্বাগতম। 😊 
+আমাদের ডেলিভারি চার্জ: ঢাকা সিটির ভেতরে ৳৬০ এবং ঢাকার বাইরে ৳১২০। সারা বাংলাদেশে মাত্র ২৪ থেকে ৪৮ ঘণ্টার মধ্যে ১০০% ক্যাশ অন ডেলিভারিতে হোম ডেলিভারি দেওয়া হয়। 
+
+পণ্য হাতে পেয়ে চেক করে তারপর মূল্য পরিশোধ করতে পারবেন। আপনার অর্ডারের বর্তমান অবস্থা জানতে আমাদের "Track Order" অপশন ব্যবহার করতে পারেন অথবা যেকোনো প্রয়োজনে আমাদের হেল্পলাইনে কল করুন: +880 1700-000000। আমি কি আপনাকে কোনো পছন্দের পণ্য খুঁজে পেতে সাহায্য করতে পারি?`
+  };
+}
+
+app.post('/api/ai/agent', async (req, res) => {
+  try {
+    const { mode, prompt, context } = req.body;
+    if (!mode) {
+      return res.status(400).json({ error: 'AI Agent mode is required (marketing, research, ad_creator, customer_support)' });
+    }
+
+    // Check if external Gemini key exists in settings
+    const keyRow = db.prepare("SELECT value FROM settings WHERE key = 'ai_gemini_api_key'").get();
+    const apiKey = (keyRow && keyRow.value) || process.env.GEMINI_API_KEY;
+
+    if (apiKey) {
+      try {
+        const systemPrompt = `You are ASPER GO's Autonomous AI E-Commerce CMO, Product Researcher, and Customer Support Agent for Bangladesh.
+Mode: ${mode}.
+User Question / Input: ${prompt || 'Generate best marketing & sales strategy'}
+Context: ${JSON.stringify(context || {})}
+Please answer in clear, motivating, and persuasive Bengali (বাংলা) with bullet points and practical e-commerce steps.`;
+
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt }] }]
+          })
+        });
+
+        if (geminiRes.ok) {
+          const data = await geminiRes.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            return res.json({
+              success: true,
+              mode,
+              result: {
+                provider: 'Google Gemini 1.5 Pro/Flash',
+                title: `${mode.toUpperCase()} - AI Generated Analysis`,
+                reply: text,
+                raw: text
+              }
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Gemini live call error, using expert engine:', err.message);
+      }
+    }
+
+    // Expert internal AI fallback
+    const result = generateExpertAIResponse(mode, prompt, context || {});
+    res.json({
+      success: true,
+      mode,
+      result
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

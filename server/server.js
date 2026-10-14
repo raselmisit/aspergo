@@ -1449,11 +1449,11 @@ Please answer in clear, motivating, and persuasive Bengali (বাংলা) wit
 const clientDist = path.join(__dirname, '../client/dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  app.use((req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/uploads') && !req.path.startsWith('/public')) {
-      return res.sendFile(path.join(clientDist, 'index.html'));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/public')) {
+      return next();
     }
-    next();
+    res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
 

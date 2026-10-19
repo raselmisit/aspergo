@@ -52,6 +52,73 @@ export default function Header({
   const searchRef = useRef(null);
   const menuCloseTimeoutRef = useRef(null);
 
+  // Auto-scroll animation frame refs for columns and quick category bar
+  const mainCatColRef = useRef(null);
+  const subCatColRef = useRef(null);
+  const childCatColRef = useRef(null);
+  const quickCategoriesRef = useRef(null);
+  const scrollAnimRef = useRef(null);
+
+  // Smooth Hover Auto-Scroll Handler
+  const handleHoverAutoScroll = (e, targetRef, direction = 'vertical') => {
+    const container = targetRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    let ratio = 0;
+
+    if (direction === 'vertical') {
+      const mouseY = e.clientY - rect.top;
+      const height = rect.height;
+      const edgeThreshold = 90; // Top/bottom trigger zone in px
+
+      if (mouseY < edgeThreshold) {
+        // Near top -> scroll up
+        ratio = -((edgeThreshold - mouseY) / edgeThreshold);
+      } else if (mouseY > height - edgeThreshold) {
+        // Near bottom -> scroll down
+        ratio = (mouseY - (height - edgeThreshold)) / edgeThreshold;
+      }
+    } else {
+      // Horizontal scrolling
+      const mouseX = e.clientX - rect.left;
+      const width = rect.width;
+      const edgeThreshold = 80;
+
+      if (mouseX < edgeThreshold) {
+        ratio = -((edgeThreshold - mouseX) / edgeThreshold);
+      } else if (mouseX > width - edgeThreshold) {
+        ratio = (mouseX - (width - edgeThreshold)) / edgeThreshold;
+      }
+    }
+
+    if (scrollAnimRef.current) {
+      cancelAnimationFrame(scrollAnimRef.current);
+      scrollAnimRef.current = null;
+    }
+
+    if (ratio !== 0) {
+      const maxSpeed = 12; // Smooth max px per frame
+      const step = () => {
+        if (!targetRef.current) return;
+        if (direction === 'vertical') {
+          targetRef.current.scrollTop += ratio * maxSpeed;
+        } else {
+          targetRef.current.scrollLeft += ratio * maxSpeed;
+        }
+        scrollAnimRef.current = requestAnimationFrame(step);
+      };
+      scrollAnimRef.current = requestAnimationFrame(step);
+    }
+  };
+
+  const stopAutoScroll = () => {
+    if (scrollAnimRef.current) {
+      cancelAnimationFrame(scrollAnimRef.current);
+      scrollAnimRef.current = null;
+    }
+  };
+
   useEffect(() => {
     api.getCategories()
       .then(res => {
@@ -506,8 +573,13 @@ export default function Header({
                 className="absolute top-full left-0 bg-white shadow-2xl border border-gray-200 rounded-b-2xl z-50 flex overflow-hidden animate-fadeIn"
                 style={{ minHeight: '360px' }}
               >
-                {/* 1st Column: Main Categories List (Vertical Serial) */}
-                <div className="w-64 sm:w-72 bg-white py-2 border-r border-gray-100 max-h-[500px] overflow-y-auto flex-shrink-0">
+                {/* 1st Column: Main Categories List (Vertical Serial with Hover Auto-Scroll) */}
+                <div 
+                  ref={mainCatColRef}
+                  onMouseMove={(e) => handleHoverAutoScroll(e, mainCatColRef, 'vertical')}
+                  onMouseLeave={stopAutoScroll}
+                  className="w-64 sm:w-72 bg-white py-2 border-r border-gray-100 max-h-[500px] overflow-y-auto flex-shrink-0"
+                >
                   <div className="px-4 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
                     Main Categories
                   </div>
@@ -538,9 +610,14 @@ export default function Header({
                   })}
                 </div>
 
-                {/* 2nd Column: Subcategories List (Vertical Serial) */}
+                {/* 2nd Column: Subcategories List (Vertical Serial with Hover Auto-Scroll) */}
                 {hoveredCategory && hoveredCategory.subcategories && hoveredCategory.subcategories.length > 0 ? (
-                  <div className="w-64 sm:w-72 bg-[#FAFBFD] py-2 border-r border-gray-200/80 max-h-[500px] overflow-y-auto flex-shrink-0">
+                  <div 
+                    ref={subCatColRef}
+                    onMouseMove={(e) => handleHoverAutoScroll(e, subCatColRef, 'vertical')}
+                    onMouseLeave={stopAutoScroll}
+                    className="w-64 sm:w-72 bg-[#FAFBFD] py-2 border-r border-gray-200/80 max-h-[500px] overflow-y-auto flex-shrink-0"
+                  >
                     <div className="px-4 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-200/80 mb-1 flex items-center justify-between">
                       <span className="truncate max-w-[150px]">{hoveredCategory.name}</span>
                       <span className="text-[10px] text-[#C8102E] font-bold">({hoveredCategory.subcategories.length})</span>
@@ -583,9 +660,14 @@ export default function Header({
                   </div>
                 )}
 
-                {/* 3rd Column: Sub-Subcategories List (Vertical Serial) */}
+                {/* 3rd Column: Sub-Subcategories List (Vertical Serial with Hover Auto-Scroll) */}
                 {hoveredSubcategory && (
-                  <div className="w-64 sm:w-80 bg-white py-2 max-h-[500px] overflow-y-auto flex-shrink-0">
+                  <div 
+                    ref={childCatColRef}
+                    onMouseMove={(e) => handleHoverAutoScroll(e, childCatColRef, 'vertical')}
+                    onMouseLeave={stopAutoScroll}
+                    className="w-64 sm:w-80 bg-white py-2 max-h-[500px] overflow-y-auto flex-shrink-0"
+                  >
                     <div className="px-4 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1 flex items-center justify-between">
                       <span className="truncate max-w-[170px]">{hoveredSubcategory.name}</span>
                       <span className="text-[10px] text-amber-600 font-bold">
@@ -639,8 +721,13 @@ export default function Header({
             )}
           </div>
 
-          {/* Quick Categories Horizontal Bar - Mega Flash Sale Style with Bold Typography & Emojis */}
-          <div className="hidden lg:flex items-center space-x-2 overflow-x-auto py-2 flex-1 mx-3 no-scrollbar">
+          {/* Quick Categories Horizontal Bar - Mega Flash Sale Style with Hover Auto-Scroll */}
+          <div 
+            ref={quickCategoriesRef}
+            onMouseMove={(e) => handleHoverAutoScroll(e, quickCategoriesRef, 'horizontal')}
+            onMouseLeave={stopAutoScroll}
+            className="hidden lg:flex items-center space-x-2 overflow-x-auto py-2 flex-1 mx-3 no-scrollbar scroll-smooth"
+          >
             {/* All Products Pill */}
             <button
               onClick={() => handleSelectFilter(null)}

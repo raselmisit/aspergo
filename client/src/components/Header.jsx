@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, ShoppingBag, User, Phone, Truck, Flame, 
   Menu, X, ChevronDown, LogOut, ShieldCheck, Heart, 
-  Sparkles, Layers, ArrowRight, ChevronRight, Tag, Smartphone
+  Sparkles, Layers, ArrowRight, ChevronRight, ChevronLeft, Tag, Smartphone
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -58,64 +58,97 @@ export default function Header({
   const childCatColRef = useRef(null);
   const quickCategoriesRef = useRef(null);
   const scrollAnimRef = useRef(null);
+  const scrollVelocityRef = useRef(0);
+  const scrollTargetRef = useRef(null);
+  const scrollDirectionRef = useRef('horizontal');
 
-  // Smooth Hover Auto-Scroll Handler
-  const handleHoverAutoScroll = (e, targetRef, direction = 'vertical') => {
+  // Unified high-performance animation loop
+  const startScrollLoop = (targetRef, direction) => {
+    scrollTargetRef.current = targetRef;
+    scrollDirectionRef.current = direction;
+
+    if (scrollAnimRef.current) return;
+
+    const loop = () => {
+      const container = scrollTargetRef.current?.current;
+      const velocity = scrollVelocityRef.current;
+
+      if (container && velocity !== 0) {
+        if (scrollDirectionRef.current === 'horizontal') {
+          container.scrollLeft += velocity;
+        } else {
+          container.scrollTop += velocity;
+        }
+        scrollAnimRef.current = requestAnimationFrame(loop);
+      } else {
+        if (scrollAnimRef.current) {
+          cancelAnimationFrame(scrollAnimRef.current);
+          scrollAnimRef.current = null;
+        }
+      }
+    };
+    scrollAnimRef.current = requestAnimationFrame(loop);
+  };
+
+  const handleHoverAutoScroll = (e, targetRef, direction = 'horizontal') => {
     const container = targetRef.current;
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    let ratio = 0;
+    let velocity = 0;
 
-    if (direction === 'vertical') {
-      const mouseY = e.clientY - rect.top;
-      const height = rect.height;
-      const edgeThreshold = 90; // Top/bottom trigger zone in px
-
-      if (mouseY < edgeThreshold) {
-        // Near top -> scroll up
-        ratio = -((edgeThreshold - mouseY) / edgeThreshold);
-      } else if (mouseY > height - edgeThreshold) {
-        // Near bottom -> scroll down
-        ratio = (mouseY - (height - edgeThreshold)) / edgeThreshold;
-      }
-    } else {
-      // Horizontal scrolling
+    if (direction === 'horizontal') {
       const mouseX = e.clientX - rect.left;
       const width = rect.width;
-      const edgeThreshold = 80;
+      const edgeZone = Math.min(160, width * 0.28); // 28% left and right trigger zones
 
-      if (mouseX < edgeThreshold) {
-        ratio = -((edgeThreshold - mouseX) / edgeThreshold);
-      } else if (mouseX > width - edgeThreshold) {
-        ratio = (mouseX - (width - edgeThreshold)) / edgeThreshold;
+      if (mouseX < edgeZone) {
+        // Left side hover -> scroll left (negative velocity)
+        const intensity = Math.pow((edgeZone - mouseX) / edgeZone, 1.2);
+        velocity = -intensity * 18;
+      } else if (mouseX > width - edgeZone) {
+        // Right side hover -> scroll right (positive velocity)
+        const intensity = Math.pow((mouseX - (width - edgeZone)) / edgeZone, 1.2);
+        velocity = intensity * 18;
+      }
+    } else {
+      // Vertical (for mega menu columns)
+      const mouseY = e.clientY - rect.top;
+      const height = rect.height;
+      const edgeZone = 90;
+
+      if (mouseY < edgeZone) {
+        const intensity = (edgeZone - mouseY) / edgeZone;
+        velocity = -intensity * 14;
+      } else if (mouseY > height - edgeZone) {
+        const intensity = (mouseY - (height - edgeZone)) / edgeZone;
+        velocity = intensity * 14;
       }
     }
 
-    if (scrollAnimRef.current) {
-      cancelAnimationFrame(scrollAnimRef.current);
-      scrollAnimRef.current = null;
-    }
+    scrollVelocityRef.current = velocity;
 
-    if (ratio !== 0) {
-      const maxSpeed = 12; // Smooth max px per frame
-      const step = () => {
-        if (!targetRef.current) return;
-        if (direction === 'vertical') {
-          targetRef.current.scrollTop += ratio * maxSpeed;
-        } else {
-          targetRef.current.scrollLeft += ratio * maxSpeed;
-        }
-        scrollAnimRef.current = requestAnimationFrame(step);
-      };
-      scrollAnimRef.current = requestAnimationFrame(step);
+    if (velocity !== 0) {
+      startScrollLoop(targetRef, direction);
+    } else {
+      stopAutoScroll();
     }
   };
 
   const stopAutoScroll = () => {
+    scrollVelocityRef.current = 0;
     if (scrollAnimRef.current) {
       cancelAnimationFrame(scrollAnimRef.current);
       scrollAnimRef.current = null;
+    }
+  };
+
+  // Wheel horizontal scrolling helper: if mouse wheel rolls on category bar, scroll horizontally
+  const handleCategoryWheel = (e) => {
+    if (quickCategoriesRef.current) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        quickCategoriesRef.current.scrollLeft += e.deltaY;
+      }
     }
   };
 
@@ -721,51 +754,81 @@ export default function Header({
             )}
           </div>
 
-          {/* Quick Categories Horizontal Bar - Mega Flash Sale Style with Hover Auto-Scroll */}
-          <div 
-            ref={quickCategoriesRef}
-            onMouseMove={(e) => handleHoverAutoScroll(e, quickCategoriesRef, 'horizontal')}
-            onMouseLeave={stopAutoScroll}
-            className="hidden lg:flex items-center space-x-2 overflow-x-auto py-2 flex-1 mx-3 no-scrollbar scroll-smooth"
-          >
-            {/* All Products Pill */}
-            <button
-              onClick={() => handleSelectFilter(null)}
-              className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-2xs ${
-                !selectedCategory && currentView === 'shop' 
-                  ? 'bg-gradient-to-r from-red-600 to-[#C8102E] text-white border-2 border-[#C8102E] shadow-sm ring-2 ring-red-400/30' 
-                  : 'bg-white hover:bg-red-50/80 text-slate-800 hover:text-[#C8102E] border border-slate-200/90 hover:border-red-300'
-              }`}
+          {/* Quick Categories Horizontal Bar - Hover Auto-Scroll with Fixed Mega Flash Sale */}
+          <div className="hidden lg:flex items-center flex-1 mx-3 min-w-0 relative group/catbar">
+            {/* Scrollable Categories Track */}
+            <div 
+              ref={quickCategoriesRef}
+              onMouseMove={(e) => handleHoverAutoScroll(e, quickCategoriesRef, 'horizontal')}
+              onMouseLeave={stopAutoScroll}
+              onWheel={handleCategoryWheel}
+              className="flex items-center space-x-2 overflow-x-auto py-2 w-full no-scrollbar select-none"
+              style={{ scrollBehavior: 'auto' }}
             >
-              <span className="text-sm leading-none filter drop-shadow-xs">🛍️</span>
-              <span>All Products</span>
+              {/* All Products Pill */}
+              <button
+                onClick={() => handleSelectFilter(null)}
+                className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-2xs flex-shrink-0 ${
+                  !selectedCategory && currentView === 'shop' 
+                    ? 'bg-gradient-to-r from-red-600 to-[#C8102E] text-white border-2 border-[#C8102E] shadow-sm ring-2 ring-red-400/30' 
+                    : 'bg-white hover:bg-red-50/80 text-slate-800 hover:text-[#C8102E] border border-slate-200/90 hover:border-red-300'
+                }`}
+              >
+                <span className="text-sm leading-none filter drop-shadow-xs">🛍️</span>
+                <span>All Products</span>
+              </button>
+
+              {/* Dynamic Product Categories with Bold Typography & Emojis */}
+              {categories.map((cat) => {
+                const isSelected = (selectedCategory === cat.slug);
+                const emoji = getCategoryEmoji(cat.name, cat.icon);
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleSelectFilter(cat.slug)}
+                    className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-2xs flex-shrink-0 group ${
+                      isSelected 
+                        ? 'bg-gradient-to-r from-red-600 to-[#C8102E] text-white border-2 border-[#C8102E] shadow-sm ring-2 ring-red-400/30' 
+                        : 'bg-white hover:bg-red-50/80 text-slate-800 hover:text-[#C8102E] border border-slate-200/90 hover:border-red-300 hover:scale-102 active:scale-98'
+                    }`}
+                  >
+                    <span className="text-sm leading-none filter drop-shadow-xs transition-transform group-hover:scale-110">
+                      {emoji}
+                    </span>
+                    <span>{cat.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Subtle Gradient Fade Edges & Click Arrow Overlays on Hover */}
+            <button
+              onClick={() => {
+                if (quickCategoriesRef.current) {
+                  quickCategoriesRef.current.scrollBy({ left: -220, behavior: 'smooth' });
+                }
+              }}
+              title="Scroll Left"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/95 border border-slate-200 shadow-md text-slate-700 hover:text-[#C8102E] flex items-center justify-center opacity-0 group-hover/catbar:opacity-100 transition-opacity z-10 cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
             </button>
 
-            {/* Dynamic Product Categories with Bold Typography & Emojis */}
-            {categories.map((cat) => {
-              const isSelected = (selectedCategory === cat.slug);
-              const emoji = getCategoryEmoji(cat.name, cat.icon);
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => handleSelectFilter(cat.slug)}
-                  className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-2xs group ${
-                    isSelected 
-                      ? 'bg-gradient-to-r from-red-600 to-[#C8102E] text-white border-2 border-[#C8102E] shadow-sm ring-2 ring-red-400/30' 
-                      : 'bg-white hover:bg-red-50/80 text-slate-800 hover:text-[#C8102E] border border-slate-200/90 hover:border-red-300 hover:scale-102 active:scale-98'
-                  }`}
-                >
-                  <span className="text-sm leading-none filter drop-shadow-xs transition-transform group-hover:scale-110">
-                    {emoji}
-                  </span>
-                  <span>{cat.name}</span>
-                </button>
-              );
-            })}
+            <button
+              onClick={() => {
+                if (quickCategoriesRef.current) {
+                  quickCategoriesRef.current.scrollBy({ left: 220, behavior: 'smooth' });
+                }
+              }}
+              title="Scroll Right"
+              className="absolute right-0 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/95 border border-slate-200 shadow-md text-slate-700 hover:text-[#C8102E] flex items-center justify-center opacity-0 group-hover/catbar:opacity-100 transition-opacity z-10 cursor-pointer"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Flash Deals Tab with Badge */}
-          <div className="flex items-center space-x-2 flex-shrink-0">
+          {/* Stationary MEGA FLASH SALE Button (Always Fixed on Right) */}
+          <div className="flex items-center space-x-2 flex-shrink-0 pl-2">
             <button
               onClick={() => handleSelectFilter('flash-deals')}
               className={`flex items-center space-x-1.5 text-xs font-black tracking-wide uppercase px-3.5 py-1.5 rounded-full transition-all duration-200 whitespace-nowrap cursor-pointer shadow-md ${

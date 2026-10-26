@@ -447,6 +447,29 @@ export default function FastCheckoutModal() {
             </div>
           </div>
 
+          {/* Trust Badges - Cash on Delivery & 24/7 Support */}
+          <div className="grid grid-cols-2 gap-2.5 p-3 bg-emerald-50/80 rounded-2xl border border-emerald-200/70 text-xs">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                <Truck className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="font-black text-emerald-950">১০০% ক্যাশ অন ডেলিভারি</div>
+                <div className="text-[10px] text-emerald-700">দেখে চেক করে মূল্য দিন</div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="font-black text-emerald-950">২৪/৭ কাস্টমার সাপোর্ট</div>
+                <div className="text-[10px] text-emerald-700">দ্রুত সমাধান নিশ্চয়তা</div>
+              </div>
+            </div>
+          </div>
+
           {/* Submit Order Button */}
           <button
             type="submit"

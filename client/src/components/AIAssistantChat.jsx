@@ -18,10 +18,10 @@ export default function AIAssistantChat() {
   const messagesEndRef = useRef(null);
 
   const quickQuestions = [
+    '🔥 সেরা ট্রেন্ডিং পণ্য সাজেস্ট করুন',
+    '📦 আমার অর্ডার ট্র্যাক করতে চাই',
     'ডেলিভারি চার্জ কত?',
-    'ক্যাশ অন ডেলিভারি সুবিধা আছে কি?',
-    'অর্ডার হাতে পেতে কত দিন লাগবে?',
-    'অর্ডার ট্র্যাকিং কীভাবে করব?'
+    'ক্যাশ অন ডেলিভারি সুবিধা আছে কি?'
   ];
 
   const scrollToBottom = () => {

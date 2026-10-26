@@ -37,7 +37,14 @@ export default function HeroSlider({ onExploreClick }) {
       subtitle: '100% Cash on Delivery & Hassle-free 1-Click Fast Checkout at your fingertip',
       badge_text: 'EXPRESS SHIPPING',
       button_text: 'EXPLORE OFFERS',
-      image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&q=80',
+      image: 'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&fm=webp&q=80',
+    },
+    {
+      title: '🔥 ধামাকা ক্যাশব্যাক ও স্পেশাল অফার!',
+      subtitle: 'প্রতিটি অর্ডারে আকর্ষণীয় ছাড়, ইনস্ট্যান্ট ক্যাশব্যাক এবং সাথে ফ্রি গিফট ভাউচার!',
+      badge_text: 'LIMITED TIME CASHBACK',
+      button_text: 'CLAIM CASHBACK',
+      image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&fm=webp&q=80',
     }
   ];
 
@@ -46,6 +53,24 @@ export default function HeroSlider({ onExploreClick }) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-4">
+      {/* Promotional Campaign & Cashback Ticker Bar */}
+      <div className="mb-3 bg-gradient-to-r from-amber-500 via-[#C8102E] to-rose-700 text-white py-2 px-4 rounded-xl shadow-sm flex items-center justify-between text-xs font-bold overflow-hidden">
+        <div className="flex items-center space-x-2 animate-pulse truncate">
+          <span className="bg-white text-[#C8102E] text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+            Mega Offer
+          </span>
+          <span className="truncate">
+            🎉 আজই অর্ডার করলে পাচ্ছেন বিশেষ ক্যাশব্যাক অফার ও সারাদেশে দ্রুততম ক্যাশ অন ডেলিভারি!
+          </span>
+        </div>
+        <button 
+          onClick={onExploreClick}
+          className="hidden sm:inline-flex items-center text-[11px] font-extrabold bg-white/20 hover:bg-white text-white hover:text-[#C8102E] px-3 py-1 rounded-lg transition ml-2 whitespace-nowrap cursor-pointer"
+        >
+          অফার দেখুন <ArrowRight className="w-3.5 h-3.5 ml-1" />
+        </button>
+      </div>
+
       {/* Hero Banner Container */}
       <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl bg-asper-dark-gradient min-h-[360px] sm:min-h-[440px] flex items-center">
         

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Flame, Clock, Zap, ArrowRight } from 'lucide-react';
 import ProductCard from './ProductCard';
 
-export default function FlashDeals({ products, onProductClick }) {
+export default function FlashDeals({ products, onProductClick, onQuickView }) {
   // Flash deals countdown timer (Ends in e.g., 23 hours 45 mins)
   const [timeLeft, setTimeLeft] = useState({
     hours: 18,
@@ -84,6 +84,7 @@ export default function FlashDeals({ products, onProductClick }) {
             key={product.id}
             product={product}
             onClick={onProductClick}
+            onQuickView={onQuickView}
           />
         ))}
       </div>

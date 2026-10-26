@@ -3,7 +3,7 @@ import { ShoppingBag, Zap, Eye, Star, Flame } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { formatImageUrl } from '../api';
 
-export default function ProductCard({ product, onClick }) {
+export default function ProductCard({ product, onClick, onQuickView }) {
   const { addToCart, buyNowDirect } = useCart();
 
   // Fluctuate live viewing count slightly around product.live_views_base to give a true real-time feel
@@ -61,12 +61,21 @@ export default function ProductCard({ product, onClick }) {
           alt={product.title}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-104 transition-transform duration-300 ease-out"
           loading="lazy"
+          decoding="async"
         />
 
-        {/* Quick View Overlay Bar */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 via-slate-950/30 to-transparent p-1.5 text-center opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-1 text-white">
-          <Eye className="w-3 h-3 text-amber-300" />
-          <span className="text-[10px] font-bold tracking-wide">বিস্তারিত দেখুন</span>
+        {/* Quick View Floating Action Bar */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onQuickView) onQuickView(product);
+            else onClick(product);
+          }}
+          className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent p-1.5 text-center opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-1.5 text-white hover:text-amber-300"
+          title="কুইক ভিউ (Quick View)"
+        >
+          <Eye className="w-3.5 h-3.5 text-amber-300" />
+          <span className="text-[11px] font-extrabold tracking-wide">কুইক ভিউ (Quick View)</span>
         </div>
       </div>
 

@@ -519,9 +519,20 @@ function seedInitialData() {
       'SUPER FAST SHIPPING',
       'ORDER NOW',
       '/products',
-      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&q=80',
+      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=1200&fm=webp&q=80',
       'linear-gradient(135deg, #8B0000 0%, #C8102E 50%, #1A1A1A 100%)',
       2
+    );
+
+    insertBanner.run(
+      '🔥 ধামাকা ক্যাশব্যাক ও স্পেশাল অফার!',
+      'প্রতিটি অর্ডারে আকর্ষণীয় ছাড়, ইনস্ট্যান্ট ক্যাশব্যাক এবং সাথে ফ্রি গিফট ভাউচার!',
+      'LIMITED TIME CASHBACK',
+      'CLAIM CASHBACK',
+      '/products',
+      'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1200&fm=webp&q=80',
+      'linear-gradient(135deg, #7A000E 0%, #C8102E 50%, #F59E0B 100%)',
+      3
     );
   }
 

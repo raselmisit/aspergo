@@ -14,6 +14,7 @@ import HeroSlider from './components/HeroSlider';
 import FlashDeals from './components/FlashDeals';
 import ProductCard from './components/ProductCard';
 import ProductDetailModal from './components/ProductDetailModal';
+import QuickViewModal from './components/QuickViewModal';
 import CartDrawer from './components/CartDrawer';
 import FastCheckoutModal from './components/FastCheckoutModal';
 import OrderSuccessModal from './components/OrderSuccessModal';
@@ -39,6 +40,7 @@ function StoreApp() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [quickViewProduct, setQuickViewProduct] = useState(null);
   
   const [sortBy, setSortBy] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
@@ -178,6 +180,7 @@ function StoreApp() {
                 <FlashDeals
                   products={products}
                   onProductClick={(prod) => setSelectedProduct(prod)}
+                  onQuickView={(prod) => setQuickViewProduct(prod)}
                 />
               </>
             )}
@@ -293,6 +296,7 @@ function StoreApp() {
                       key={product.id}
                       product={product}
                       onClick={(p) => setSelectedProduct(p)}
+                      onQuickView={(p) => setQuickViewProduct(p)}
                     />
                   ))}
                 </div>
@@ -327,6 +331,12 @@ function StoreApp() {
       <ProductDetailModal
         product={selectedProduct}
         onClose={() => setSelectedProduct(null)}
+      />
+
+      <QuickViewModal
+        product={quickViewProduct}
+        isOpen={Boolean(quickViewProduct)}
+        onClose={() => setQuickViewProduct(null)}
       />
 
       <CartDrawer />

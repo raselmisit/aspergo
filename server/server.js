@@ -1376,12 +1376,60 @@ function generateExpertAIResponse(mode, prompt, context = {}) {
   }
 
   // mode === 'customer_support'
+  const promptLower = (prompt || '').toLowerCase();
+  
+  // Dynamic order tracking detection
+  const orderMatch = (prompt || '').match(/ASPER-\d+/i) || (prompt || '').match(/\b\d{4,}\b/);
+  if (promptLower.includes('track') || promptLower.includes('ট্র্যাক') || promptLower.includes('অর্ডার কোথায়') || promptLower.includes('অর্ডারের অবস্থা') || orderMatch) {
+    if (orderMatch) {
+      const orderNum = orderMatch[0].toUpperCase();
+      try {
+        const found = db.prepare("SELECT order_number, status, total_amount, customer_name, created_at FROM orders WHERE order_number LIKE ?").get(`%${orderNum}%`);
+        if (found) {
+          const statusMap = {
+            'pending': '⏳ অপেক্ষমান (Processing)',
+            'confirmed': '✅ নিশ্চিত করা হয়েছে (Confirmed)',
+            'shipped': '🚚 কুরিয়ারে পাঠানো হয়েছে (In Transit)',
+            'delivered': '🎉 সফলভাবে ডেলিভারি সম্পন্ন (Delivered)',
+            'cancelled': '❌ বাতিল করা হয়েছে (Cancelled)'
+          };
+          return {
+            provider: 'aspergo_support_ai',
+            reply: `📦 আপনার অর্ডার নম্বর #${found.order_number} এর তথ্য:\n\n• কাস্টমার: ${found.customer_name}\n• বর্তমান অবস্থা: ${statusMap[found.status] || found.status}\n• মোট মূল্য: ৳${found.total_amount}\n• তারিখ: ${found.created_at}\n\nআমাদের কুরিয়ার পার্টনার দ্রুততম সময়ে আপনার ঠিকানায় পৌঁছাবে। চেক করে মূল্য পরিশোধ করতে পারবেন।`
+          };
+        }
+      } catch (e) {
+        // Fallthrough
+      }
+    }
+    return {
+      provider: 'aspergo_support_ai',
+      reply: `📦 আপনার অর্ডার ট্র্যাক করতে আপনার অর্ডার নম্বরটি এখানে লিখুন (যেমন: ASPER-1001) অথবা মেনু থেকে সরাসরি "Track Order" ট্যাবে গিয়ে আপনার ফোন নম্বর বা অর্ডার কোড দিয়ে লাইভ স্ট্যাটাস দেখতে পারবেন!`
+    };
+  }
+
+  // Product suggestion detection
+  if (promptLower.includes('পণ্য') || promptLower.includes('product') || promptLower.includes('সেরা') || promptLower.includes('সাজেস্ট') || promptLower.includes('suggest') || promptLower.includes('কিনব') || promptLower.includes('কম দামে')) {
+    try {
+      const hotProds = db.prepare("SELECT title, price, discount_price FROM products WHERE is_featured = 1 OR is_flash_deal = 1 LIMIT 3").all();
+      if (hotProds && hotProds.length > 0) {
+        const listText = hotProds.map(p => `• ${p.title} — ৳${p.discount_price || p.price}`).join('\n');
+        return {
+          provider: 'aspergo_support_ai',
+          reply: `🔥 বর্তমানে ASPER GO এর সবচেয়ে হট ট্রেন্ডিং ও বেস্ট সেলিং পণ্যসমূহ:\n\n${listText}\n\nপণ্যগুলোতে আজই রয়েছে বিশেষ ছাড় ও ক্যাশ অন ডেলিভারি সুবিধা! আপনি কোন ধরনের প্রোডাক্ট খুঁজছেন?`
+        };
+      }
+    } catch (e) {
+      // Fallthrough
+    }
+  }
+
   return {
     provider: 'aspergo_support_ai',
     reply: `হ্যালো! ASPER GO তে আপনাকে স্বাগতম। 😊 
 আমাদের ডেলিভারি চার্জ: ঢাকা সিটির ভেতরে ৳৬০ এবং ঢাকার বাইরে ৳১২০। সারা বাংলাদেশে মাত্র ২৪ থেকে ৪৮ ঘণ্টার মধ্যে ১০০% ক্যাশ অন ডেলিভারিতে হোম ডেলিভারি দেওয়া হয়। 
 
-পণ্য হাতে পেয়ে চেক করে তারপর মূল্য পরিশোধ করতে পারবেন। আপনার অর্ডারের বর্তমান অবস্থা জানতে আমাদের "Track Order" অপশন ব্যবহার করতে পারেন অথবা যেকোনো প্রয়োজনে আমাদের হেল্পলাইনে কল করুন: +880 1700-000000। আমি কি আপনাকে কোনো পছন্দের পণ্য খুঁজে পেতে সাহায্য করতে পারি?`
+পণ্য হাতে পেয়ে চেক করে তারপর মূল্য পরিশোধ করতে পারবেন। আপনার অর্ডারের বর্তমান অবস্থা জানতে আপনার অর্ডার নম্বরটি আমাকে বলতে পারেন অথবা "Track Order" ব্যবহার করুন। আমি কি আপনাকে কোনো ট্রেন্ডিং পণ্য সাজেস্ট করতে পারি?`
   };
 }
 

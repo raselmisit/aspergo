@@ -13,8 +13,8 @@ export default function Footer({ onCategorySelect, onTrackClick }) {
               <Truck className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-black text-white text-xs sm:text-sm">Fast Delivery</div>
-              <div className="text-[11px] text-amber-200/70">24-48h All Over Bangladesh</div>
+              <div className="font-black text-white text-xs sm:text-sm">100% Cash on Delivery</div>
+              <div className="text-[11px] text-amber-200/70">হাতে পেয়ে চেক করে মূল্য দিন</div>
             </div>
           </div>
 
@@ -23,8 +23,8 @@ export default function Footer({ onCategorySelect, onTrackClick }) {
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-black text-white text-xs sm:text-sm">100% Authentic</div>
-              <div className="text-[11px] text-amber-200/70">Verified Quality Guaranteed</div>
+              <div className="font-black text-white text-xs sm:text-sm">100% Authentic Quality</div>
+              <div className="text-[11px] text-amber-200/70">যাচাইকৃত সেরা ও টেকসই মান</div>
             </div>
           </div>
 
@@ -33,8 +33,8 @@ export default function Footer({ onCategorySelect, onTrackClick }) {
               <RefreshCw className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-black text-white text-xs sm:text-sm">Easy Returns</div>
-              <div className="text-[11px] text-amber-200/70">7 Days Hassle-Free Policy</div>
+              <div className="font-black text-white text-xs sm:text-sm">Easy 7 Days Returns</div>
+              <div className="text-[11px] text-amber-200/70">সহজ রিটার্ন ও রিপ্লেসমেন্ট</div>
             </div>
           </div>
 
@@ -43,8 +43,8 @@ export default function Footer({ onCategorySelect, onTrackClick }) {
               <Headphones className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-black text-white text-xs sm:text-sm">Dedicated Support</div>
-              <div className="text-[11px] text-amber-200/70">Daily 9:00 AM - 10:00 PM</div>
+              <div className="font-black text-white text-xs sm:text-sm">24/7 Dedicated Support</div>
+              <div className="text-[11px] text-amber-200/70">সার্বক্ষণিক কাস্টমার কেয়ার</div>
             </div>
           </div>
         </div>

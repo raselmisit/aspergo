@@ -24,6 +24,11 @@ export function getBackendBaseUrl() {
 export function formatImageUrl(url) {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    // If Unsplash, ensure modern WebP format and responsive auto-optimization
+    if (url.includes('unsplash.com') && !url.includes('fm=webp')) {
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}fm=webp&q=80`;
+    }
     return url;
   }
   const base = getBackendBaseUrl();
